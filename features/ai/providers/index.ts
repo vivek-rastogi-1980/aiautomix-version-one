@@ -1,0 +1,93 @@
+import "server-only";
+
+import { AiError } from "@/features/ai/engine/errors";
+import type { AiProvider, ProviderId } from "@/features/ai/engine/types";
+import {
+  createOpenAiProvider,
+  getOpenAiModel,
+  isOpenAiConfigured,
+} from "@/features/ai/providers/openai";
+
+/**
+ * Model Provider Layer (MODEL-PROVIDER-SPEC.md).
+ *
+ * Workflows name a provider; they never construct one. Adding Anthropic, Gemini
+ * or Azure OpenAI means implementing `AiProvider` and adding one line to
+ * `PROVIDERS` below — no workflow, service, route or component changes.
+ */
+
+interface ProviderEntry {
+  readonly label: string;
+  /** Whether this deployment can actually call the provider. */
+  readonly isConfigured: () => boolean;
+  /** Undefined for providers that are declared but not yet implemented. */
+  readonly create?: (model?: string) => AiProvider;
+  /** Model used when neither the workflow nor the caller names one. */
+  readonly defaultModel?: () => string;
+}
+
+const PROVIDERS: Record<ProviderId, ProviderEntry> = {
+  openai: {
+    label: "OpenAI",
+    isConfigured: isOpenAiConfigured,
+    create: createOpenAiProvider,
+    defaultModel: getOpenAiModel,
+  },
+  anthropic: { label: "Anthropic", isConfigured: () => false },
+  gemini: { label: "Google Gemini", isConfigured: () => false },
+  "azure-openai": { label: "Azure OpenAI", isConfigured: () => false },
+};
+
+export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
+
+/** The provider used by workflows that do not name one. */
+export function getDefaultProviderId(): ProviderId {
+  const configured = process.env.AI_PROVIDER as ProviderId | undefined;
+  return configured && configured in PROVIDERS ? configured : "openai";
+}
+
+export function isProviderImplemented(id: ProviderId): boolean {
+  return typeof PROVIDERS[id]?.create === "function";
+}
+
+/** True when the named provider is both implemented and holds credentials. */
+export function isProviderConfigured(id: ProviderId): boolean {
+  const entry = PROVIDERS[id];
+  return Boolean(entry?.create) && Boolean(entry?.isConfigured());
+}
+
+/** True when the platform can run a workflow at all. */
+export function isPlatformConfigured(): boolean {
+  return isProviderConfigured(getDefaultProviderId());
+}
+
+/** The model a run would use, without constructing a provider. */
+export function resolveModelId(id: ProviderId, model?: string): string {
+  return model || PROVIDERS[id]?.defaultModel?.() || "unknown";
+}
+
+/**
+ * Build a provider instance. Throws a typed error when the id is unknown, not
+ * implemented in this release, or missing credentials — the three cases a
+ * deployment can realistically hit.
+ */
+export function createProvider(id: ProviderId, model?: string): AiProvider {
+  const entry = PROVIDERS[id];
+
+  if (!entry) {
+    throw new AiError("AI_PROVIDER_UNSUPPORTED", `Unknown AI provider: ${id}`);
+  }
+
+  if (!entry.create) {
+    throw new AiError(
+      "AI_PROVIDER_UNSUPPORTED",
+      `The ${entry.label} provider is declared but not implemented in this release.`,
+    );
+  }
+
+  return entry.create(model);
+}
+
+export function getProviderLabel(id: string): string {
+  return PROVIDERS[id as ProviderId]?.label ?? id;
+}

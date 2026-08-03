@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Next.js compiles the app with the automatic JSX runtime; the root config
+    // says "preserve" because Next owns that transform. Standalone scripts run
+    // through tsx/esbuild need the runtime spelled out.
+    "jsx": "react-jsx"
+  }
+}

@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Global rules shared by every migrated page (identical in all 24 original
+ * design files). Page-specific keyframes/media queries live next to each
+ * feature in a scoped <PageStyles> block for pixel fidelity.
+ */
+body {
+  margin: 0;
+  background: #0a0b0f;
+}
