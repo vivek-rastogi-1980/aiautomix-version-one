@@ -8,6 +8,8 @@ import { businessIdeaSchema } from "@/lib/validations/business-idea";
 import { validateBusinessIdea } from "@/features/ai/services/business-validator";
 import { AiError, toAiError } from "@/features/ai/engine/errors";
 import { isPlatformConfigured } from "@/features/ai/providers";
+import { getWorkspaceContext } from "@/features/workspaces/data";
+import { canEdit } from "@/features/workspaces/roles";
 import {
   type ActionState,
   errorState,
@@ -52,9 +54,18 @@ export async function submitBusinessIdeaAction(
     return errorState(new AiError("AI_NOT_CONFIGURED").userMessage);
   }
 
+  const { workspace, role } = await getWorkspaceContext(user.id);
+  if (!canEdit(role)) {
+    return errorState("Your role in this workspace is read-only.");
+  }
+
   let reportId: string;
   try {
-    const outcome = await validateBusinessIdea(user.id, parsed.data);
+    const outcome = await validateBusinessIdea(
+      user.id,
+      workspace.id,
+      parsed.data,
+    );
     reportId = outcome.report.id;
   } catch (error) {
     const aiError = toAiError(error);

@@ -15,6 +15,8 @@ const PROTECTED_PREFIXES = [
   "/validator",
   "/reports",
   "/ai",
+  "/plans",
+  "/workspace",
 ];
 
 /** Auth routes an already-signed-in user should be bounced away from. */

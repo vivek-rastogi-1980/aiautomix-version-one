@@ -3,11 +3,16 @@ import type {
   AnyWorkflowDefinition,
   WorkflowDefinition,
 } from "@/features/ai/engine/types";
+import { businessPlanSchema } from "@/features/ai/schemas/business-plan";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 import {
   businessIdeaSchema,
   toPromptVariables,
 } from "@/lib/validations/business-idea";
+import {
+  businessPlanInputSchema,
+  toPlanPromptVariables,
+} from "@/lib/validations/business-plan";
 
 /**
  * Workflow Registry (AI-PLATFORM-SPEC.md, WORKFLOW-MANAGER-SPEC.md).
@@ -20,6 +25,7 @@ import {
  */
 
 export const BUSINESS_VALIDATOR_WORKFLOW = "business-validator";
+export const BUSINESS_PLAN_WORKFLOW = "business-plan";
 
 const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
   [BUSINESS_VALIDATOR_WORKFLOW]: {
@@ -32,6 +38,19 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
     outputSchema: businessValidatorReportSchema,
     toVariables: toPromptVariables,
     provider: "openai",
+  },
+  [BUSINESS_PLAN_WORKFLOW]: {
+    id: BUSINESS_PLAN_WORKFLOW,
+    label: "Business Plan Generator",
+    description:
+      "Generates an eleven-section business plan from a structured brief.",
+    promptVersion: "v1",
+    inputSchema: businessPlanInputSchema,
+    outputSchema: businessPlanSchema,
+    toVariables: toPlanPromptVariables,
+    provider: "openai",
+    // Eleven prose sections do not fit in the platform default of 4000.
+    maxOutputTokens: 9000,
   },
 };
 

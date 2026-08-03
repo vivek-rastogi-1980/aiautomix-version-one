@@ -1,37 +1,18 @@
 import { z } from "zod";
 
+import {
+  optionalText,
+  optionalUuid,
+  requiredText,
+} from "@/lib/validations/text";
+
 /**
  * Business idea submission contract (BUSINESS-VALIDATOR-SPEC.md "Input Fields").
  * Shared by the Server Action, the REST endpoint, and the form UI.
+ *
+ * Field builders and input sanitisation come from `lib/validations/text.ts`,
+ * which the business-plan schema uses too.
  */
-
-/** Collapse whitespace and strip control characters that break prompts/PDFs. */
-const clean = (value: unknown) =>
-  typeof value === "string"
-    ? // eslint-disable-next-line no-control-regex -- deliberately stripping C0/C1 control chars
-      value
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "")
-        .trim()
-    : value;
-
-const requiredText = (label: string, min: number, max: number) =>
-  z.preprocess(
-    clean,
-    z
-      .string()
-      .min(min, `${label} must be at least ${min} characters`)
-      .max(max, `${label} must be at most ${max} characters`),
-  );
-
-const optionalText = (max: number) =>
-  z.preprocess(
-    clean,
-    z
-      .string()
-      .max(max, `Must be at most ${max} characters`)
-      .optional()
-      .default(""),
-  );
 
 export const BUSINESS_STAGES = [
   "idea",
@@ -80,10 +61,7 @@ export const businessIdeaSchema = z.object({
   additionalNotes: optionalText(2000),
 
   /** Optional link to an existing project. */
-  projectId: z.preprocess(
-    clean,
-    z.string().uuid("Choose a valid project").optional().or(z.literal("")),
-  ),
+  projectId: optionalUuid("Choose a valid project"),
 });
 
 export type BusinessIdeaInput = z.infer<typeof businessIdeaSchema>;

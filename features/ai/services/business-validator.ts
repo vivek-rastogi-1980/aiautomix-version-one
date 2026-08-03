@@ -28,6 +28,7 @@ export interface ValidationOutcome {
 
 export async function validateBusinessIdea(
   userId: string,
+  workspaceId: string,
   input: BusinessIdeaInput,
 ): Promise<ValidationOutcome> {
   const supabase = await createClient();
@@ -38,6 +39,7 @@ export async function validateBusinessIdea(
     .from("business_ideas")
     .insert({
       user_id: userId,
+      workspace_id: workspaceId,
       project_id: projectId,
       title: input.businessName,
       payload_json: input as unknown as Record<string, unknown>,
@@ -71,6 +73,7 @@ export async function validateBusinessIdea(
       .from("validation_reports")
       .insert({
         user_id: userId,
+        workspace_id: workspaceId,
         business_idea_id: idea.id,
         score: data.overallScore,
         report_json: data as unknown as Record<string, unknown>,

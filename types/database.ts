@@ -36,6 +36,8 @@ export type Profile = {
 export type Project = {
   id: string;
   user_id: string;
+  /** Sprint 5: the workspace this project belongs to. */
+  workspace_id: string | null;
   name: string;
   description: string | null;
   status: ProjectStatus;
@@ -53,6 +55,7 @@ export type BusinessIdeaStatus =
 export type BusinessIdea = {
   id: string;
   user_id: string;
+  workspace_id: string | null;
   project_id: string | null;
   title: string;
   payload_json: Record<string, unknown>;
@@ -65,6 +68,7 @@ export type BusinessIdea = {
 export type ValidationReport = {
   id: string;
   user_id: string;
+  workspace_id: string | null;
   business_idea_id: string;
   score: number;
   report_json: Record<string, unknown>;
@@ -157,10 +161,94 @@ export type AiPromptVersionRecord = {
   created_at: string;
 };
 
+// --- Sprint 5: Workspaces + Business Plans ----------------------------------
+
+/** WORKSPACE-ARCHITECTURE.md: Owner, Admin, Member, Viewer. */
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
+export const WORKSPACE_ROLES: readonly WorkspaceRole[] = [
+  "owner",
+  "admin",
+  "member",
+  "viewer",
+] as const;
+
+export type Workspace = {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  is_personal: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+export type WorkspaceMember = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: WorkspaceRole;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BusinessPlanStatus = "draft" | "generating" | "ready" | "failed";
+
+export type BusinessPlan = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  project_id: string | null;
+  business_idea_id: string | null;
+  title: string;
+  summary: string | null;
+  status: BusinessPlanStatus;
+  input_json: Record<string, unknown>;
+  workflow: string;
+  prompt_version: string;
+  model: string;
+  ai_request_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+/** Whether a section's current content came from the model or a human edit. */
+export type PlanContentSource = "ai" | "user";
+
+export type BusinessPlanSection = {
+  id: string;
+  plan_id: string;
+  workspace_id: string;
+  section_key: string;
+  title: string;
+  content: string;
+  position: number;
+  current_version: number;
+  source: PlanContentSource;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BusinessPlanVersion = {
+  id: string;
+  section_id: string;
+  plan_id: string;
+  workspace_id: string;
+  section_key: string;
+  version: number;
+  content: string;
+  source: PlanContentSource;
+  edited_by: string | null;
+  created_at: string;
+};
+
 type BusinessIdeaInsert = {
   user_id: string;
   title: string;
   payload_json: Record<string, unknown>;
+  workspace_id?: string | null;
   project_id?: string | null;
   status?: BusinessIdeaStatus;
   id?: string;
@@ -179,6 +267,7 @@ type ValidationReportInsert = {
   report_json: Record<string, unknown>;
   prompt_version: string;
   model: string;
+  workspace_id?: string | null;
   workflow?: string;
   pdf_url?: string | null;
   duration_ms?: number | null;
@@ -280,6 +369,7 @@ type ProfileUpdate = Partial<Omit<Profile, "id" | "created_at">>;
 type ProjectInsert = {
   user_id: string;
   name: string;
+  workspace_id?: string | null;
   status?: ProjectStatus;
   description?: string | null;
   website?: string | null;
@@ -289,6 +379,82 @@ type ProjectInsert = {
   deleted_at?: string | null;
 };
 type ProjectUpdate = Partial<Omit<Project, "id" | "user_id" | "created_at">>;
+
+type WorkspaceInsert = {
+  owner_id: string;
+  name: string;
+  slug: string;
+  is_personal?: boolean;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+};
+type WorkspaceUpdate = Partial<Omit<Workspace, "id" | "created_at">>;
+
+type WorkspaceMemberInsert = {
+  workspace_id: string;
+  user_id: string;
+  role?: WorkspaceRole;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+type WorkspaceMemberUpdate = Partial<
+  Omit<WorkspaceMember, "id" | "created_at">
+>;
+
+type BusinessPlanInsert = {
+  workspace_id: string;
+  user_id: string;
+  title: string;
+  input_json: Record<string, unknown>;
+  prompt_version: string;
+  model: string;
+  project_id?: string | null;
+  business_idea_id?: string | null;
+  summary?: string | null;
+  status?: BusinessPlanStatus;
+  workflow?: string;
+  ai_request_id?: string | null;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+};
+type BusinessPlanUpdate = Partial<
+  Omit<BusinessPlan, "id" | "workspace_id" | "user_id" | "created_at">
+>;
+
+type BusinessPlanSectionInsert = {
+  plan_id: string;
+  workspace_id: string;
+  section_key: string;
+  title: string;
+  content: string;
+  position: number;
+  current_version?: number;
+  source?: PlanContentSource;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+type BusinessPlanSectionUpdate = Partial<
+  Omit<BusinessPlanSection, "id" | "plan_id" | "workspace_id" | "created_at">
+>;
+
+type BusinessPlanVersionInsert = {
+  section_id: string;
+  plan_id: string;
+  workspace_id: string;
+  section_key: string;
+  version: number;
+  content: string;
+  source: PlanContentSource;
+  edited_by?: string | null;
+  id?: string;
+  created_at?: string;
+};
 
 /**
  * Minimal `Database` shape for typing the Supabase client. Each table carries
@@ -350,6 +516,36 @@ export interface Database {
         Row: AiPromptVersionRecord;
         Insert: AiPromptVersionInsert;
         Update: Partial<AiPromptVersionRecord>;
+        Relationships: [];
+      };
+      workspaces: {
+        Row: Workspace;
+        Insert: WorkspaceInsert;
+        Update: WorkspaceUpdate;
+        Relationships: [];
+      };
+      workspace_members: {
+        Row: WorkspaceMember;
+        Insert: WorkspaceMemberInsert;
+        Update: WorkspaceMemberUpdate;
+        Relationships: [];
+      };
+      business_plans: {
+        Row: BusinessPlan;
+        Insert: BusinessPlanInsert;
+        Update: BusinessPlanUpdate;
+        Relationships: [];
+      };
+      business_plan_sections: {
+        Row: BusinessPlanSection;
+        Insert: BusinessPlanSectionInsert;
+        Update: BusinessPlanSectionUpdate;
+        Relationships: [];
+      };
+      business_plan_versions: {
+        Row: BusinessPlanVersion;
+        Insert: BusinessPlanVersionInsert;
+        Update: Partial<BusinessPlanVersion>;
         Relationships: [];
       };
     };

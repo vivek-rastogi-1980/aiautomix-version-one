@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Building2,
   FileText,
   FolderKanban,
   LayoutDashboard,
+  NotebookPen,
   Settings,
   Sparkles,
   UserRound,
@@ -24,9 +26,11 @@ interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/validator", label: "Idea Validator", icon: Sparkles },
+  { href: "/plans", label: "Business Plans", icon: NotebookPen },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/ai/history", label: "AI activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/workspace", label: "Workspace", icon: Building2 },
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

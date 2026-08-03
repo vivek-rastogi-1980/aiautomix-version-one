@@ -1,0 +1,117 @@
+import { type NextRequest } from "next/server";
+
+import { toAiError } from "@/features/ai/engine/errors";
+import { isPlatformConfigured } from "@/features/ai/providers";
+import { generateBusinessPlan } from "@/features/ai/services/business-plan";
+import { getBusinessPlans } from "@/features/business-plans/data";
+import { getWorkspaceContext } from "@/features/workspaces/data";
+import { canEdit } from "@/features/workspaces/roles";
+import { getUser } from "@/lib/auth/session";
+import {
+  apiError,
+  apiSuccess,
+  apiValidationError,
+  logApiError,
+  rateLimitOrError,
+} from "@/lib/api/response";
+import { businessPlanInputSchema } from "@/lib/validations/business-plan";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** GET /api/business-plans — plans in the caller's workspace. */
+export async function GET() {
+  const user = await getUser();
+  if (!user) return apiError("UNAUTHORIZED", "You must be signed in.", 401);
+
+  const limited = rateLimitOrError(user.id, "business-plans:list");
+  if (limited) return limited;
+
+  try {
+    const { workspace } = await getWorkspaceContext(user.id);
+    const plans = await getBusinessPlans(workspace.id);
+
+    return apiSuccess(
+      plans.map((plan) => ({
+        id: plan.id,
+        title: plan.title,
+        status: plan.status,
+        workspaceId: plan.workspace_id,
+        projectId: plan.project_id,
+        businessIdeaId: plan.business_idea_id,
+        model: plan.model,
+        promptVersion: plan.prompt_version,
+        createdAt: plan.created_at,
+        updatedAt: plan.updated_at,
+      })),
+    );
+  } catch (error) {
+    logApiError("GET /api/business-plans", error);
+    return apiError("INTERNAL_ERROR", "Could not load business plans.", 500);
+  }
+}
+
+/**
+ * POST /api/business-plans — generate a plan from a brief.
+ * Shares the exact service the Server Action uses.
+ */
+export async function POST(request: NextRequest) {
+  const user = await getUser();
+  if (!user) return apiError("UNAUTHORIZED", "You must be signed in.", 401);
+
+  const limited = rateLimitOrError(user.id, "business-plans:create");
+  if (limited) return limited;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return apiError("INVALID_JSON", "Request body must be valid JSON.", 400);
+  }
+
+  const parsed = businessPlanInputSchema.safeParse(body);
+  if (!parsed.success) return apiValidationError(parsed.error);
+
+  if (!isPlatformConfigured()) {
+    return apiError(
+      "AI_NOT_CONFIGURED",
+      "The AI service is not configured.",
+      503,
+    );
+  }
+
+  try {
+    const { workspace, role } = await getWorkspaceContext(user.id);
+    if (!canEdit(role)) {
+      return apiError(
+        "FORBIDDEN",
+        "Your role in this workspace is read-only.",
+        403,
+      );
+    }
+
+    const outcome = await generateBusinessPlan({
+      userId: user.id,
+      workspaceId: workspace.id,
+      input: parsed.data,
+    });
+
+    return apiSuccess(
+      {
+        planId: outcome.plan.id,
+        title: outcome.plan.title,
+        sections: outcome.sections.map((section) => ({
+          key: section.section_key,
+          title: section.title,
+          content: section.content,
+          version: section.current_version,
+        })),
+      },
+      201,
+    );
+  } catch (error) {
+    const aiError = toAiError(error);
+    logApiError("POST /api/business-plans", aiError);
+    return apiError(aiError.code, aiError.userMessage, aiError.status);
+  }
+}
