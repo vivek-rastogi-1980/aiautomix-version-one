@@ -28,7 +28,9 @@ export const GET = withApiAuth<{ id: string }>(
         tokens: result.report.tokens_used,
       },
       createdAt: result.report.created_at,
-      idea: result.idea ? { id: result.idea.id, title: result.idea.title } : null,
+      idea: result.idea
+        ? { id: result.idea.id, title: result.idea.title }
+        : null,
     });
   },
 );
