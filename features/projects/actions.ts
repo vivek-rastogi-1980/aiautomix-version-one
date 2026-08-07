@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getWorkspaceContext } from "@/features/workspaces/data";
+import { canEdit } from "@/features/workspaces/roles";
 import { projectSchema } from "@/lib/validations/project";
 import type { ProjectStatus } from "@/types/database";
 import {
@@ -13,6 +14,22 @@ import {
   successState,
   zodFieldErrors,
 } from "@/lib/forms/action-state";
+
+/**
+ * Projects are workspace content, so every mutation checks the caller's role —
+ * the same guard `features/business-plans/actions.ts` and
+ * `features/business-ideas/actions.ts` already applied. Projects were the one
+ * mutation path that skipped it, relying solely on the owner-only write policy
+ * in RLS.
+ *
+ * That is sound today only because workspaces are all personal, which makes
+ * every caller an Owner. The moment invitations land, a Viewer could create a
+ * project *into* a workspace they are only supposed to read: the insert names
+ * themselves as `user_id`, so the owner-only policy allows it. Closing it now
+ * costs nothing — `canEdit` is true for every existing user — and means the
+ * invitation flow does not have to remember to come back here.
+ */
+const READ_ONLY = "Your role in this workspace is read-only.";
 
 function parseForm(formData: FormData) {
   return projectSchema.safeParse({
@@ -43,7 +60,8 @@ export async function createProjectAction(
   }
 
   // Sprint 5: new projects join the caller's workspace.
-  const { workspace } = await getWorkspaceContext(user.id);
+  const { workspace, role } = await getWorkspaceContext(user.id);
+  if (!canEdit(role)) return errorState(READ_ONLY);
 
   const supabase = await createClient();
   const { error } = await supabase.from("projects").insert({
@@ -82,6 +100,9 @@ export async function updateProjectAction(
     );
   }
 
+  const { role } = await getWorkspaceContext(user.id);
+  if (!canEdit(role)) return errorState(READ_ONLY);
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
@@ -113,6 +134,9 @@ export async function deleteProjectAction(
   if (typeof id !== "string" || !id) {
     return errorState("Missing project id.");
   }
+
+  const { role } = await getWorkspaceContext(user.id);
+  if (!canEdit(role)) return errorState(READ_ONLY);
 
   const supabase = await createClient();
   const { error } = await supabase
