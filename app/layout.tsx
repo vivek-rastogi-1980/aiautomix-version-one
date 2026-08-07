@@ -4,8 +4,23 @@ import "@/styles/globals.css";
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
+/**
+ * Absolute base for canonical URLs and Open Graph images.
+ *
+ * This was hardcoded to the staging host, which meant every share preview and
+ * canonical URL on production would have pointed back at staging — and broken
+ * outright once staging goes away or gets password-protected. Deriving it from
+ * `NEXT_PUBLIC_SITE_URL` (already set per environment for auth email links)
+ * keeps one source of truth, so preview, staging and production each describe
+ * themselves correctly. The production domain is the fallback rather than
+ * staging: if the variable is ever missing, the safer wrong answer is the real
+ * site.
+ */
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.aiautomix.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://staging.aiautomix.com"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default:
       "AIAutomix — AI-Powered Business Strategy, Automation & Validation",

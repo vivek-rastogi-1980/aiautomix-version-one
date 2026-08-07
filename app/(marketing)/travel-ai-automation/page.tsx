@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "How AI Automation Transforms Travel | AIAutomix",
     description:
       "Travel is a $9 trillion industry still run on manual processes. See how AI automation closes the biggest gaps — with real data.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "How AI Automation Transforms Education | AIAutomix",
     description:
       "Education is a $1 trillion industry still run on manual processes. See how AI automation closes the five biggest gaps — and the SaaS ideas worth building.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

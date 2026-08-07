@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Growth Plan with AI | AIAutomix",
     description:
       "An AI analyst that finds your next highest-leverage growth move every week.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

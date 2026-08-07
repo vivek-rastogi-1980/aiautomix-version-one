@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Create a Business Plan with AI | AIAutomix",
     description:
       "Describe your idea in plain language and AIAutomix drafts a complete, funding-ready business plan in minutes.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

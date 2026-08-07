@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "How AI Automation Transforms Real Estate | AIAutomix",
     description:
       "Real estate is a $300+ trillion asset class still run on manual workflows. See how AI automation closes the biggest gaps — with real data.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "AI-Powered CRM | AIAutomix",
     description:
       "A CRM that updates itself — deals, contacts, and follow-ups logged automatically.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

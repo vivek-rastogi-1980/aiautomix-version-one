@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "Services | AIAutomix",
     description:
       "Everything your business needs to launch, fund, and scale — powered by AI.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

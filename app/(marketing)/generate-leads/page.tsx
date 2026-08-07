@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Generate Leads with AI | AIAutomix",
     description:
       "Fill your pipeline automatically — AI-sourced, scored, and routed leads, 24/7.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };
