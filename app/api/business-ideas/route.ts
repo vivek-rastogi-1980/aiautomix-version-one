@@ -6,6 +6,8 @@ import { businessIdeaSchema } from "@/lib/validations/business-idea";
 import { validateBusinessIdea } from "@/features/ai/services/business-validator";
 import { toAiError } from "@/features/ai/engine/errors";
 import { isPlatformConfigured } from "@/features/ai/providers";
+import { getWorkspaceContext } from "@/features/workspaces/data";
+import { canEdit } from "@/features/workspaces/roles";
 import {
   apiError,
   apiSuccess,
@@ -63,7 +65,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const outcome = await validateBusinessIdea(user.id, parsed.data);
+    const { workspace, role } = await getWorkspaceContext(user.id);
+    if (!canEdit(role)) {
+      return apiError(
+        "FORBIDDEN",
+        "Your role in this workspace is read-only.",
+        403,
+      );
+    }
+
+    const outcome = await validateBusinessIdea(
+      user.id,
+      workspace.id,
+      parsed.data,
+    );
     return apiSuccess(
       {
         ideaId: outcome.idea.id,

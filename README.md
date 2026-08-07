@@ -4,10 +4,12 @@ The AIAutomix **AI Business Operating System**, built on **Next.js 15**.
 Sprint 1 migrated the design handoff into a pixel-faithful marketing front end.
 **Sprint 2** added Supabase authentication, a protected dashboard, and project
 & profile management. **Sprint 3** shipped the flagship AI feature: the
-**Business Idea Validator**. **Sprint 4** extracts the reusable **AI Platform
-Core** that every future AI product runs on — workflow manager, prompt registry,
+**Business Idea Validator**. **Sprint 4** extracted the reusable **AI Platform
+Core** that every AI product runs on — workflow manager, prompt registry,
 provider layer, response validator, report engine, PDF engine, usage tracking
-and AI history.
+and AI history. **Sprint 5** adds the **Business Plan Generator** — the first
+feature built entirely on that platform — and the **workspace foundation**
+underneath everything.
 
 ## Stack
 
@@ -47,15 +49,15 @@ anon key into `.env.local` (Project Settings → API):
 | ------------------------------- | -------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL                         |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (or the publishable key)   |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Server-only key (reserved for later sprints) |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Server-only key (used by `sync:workflows`)   |
 | `NEXT_PUBLIC_SITE_URL`          | Absolute site URL for auth email links       |
 | `OPENAI_API_KEY`                | **Required to run any AI workflow** (server) |
 | `OPENAI_MODEL`                  | Optional model override (`gpt-4o-mini`)      |
 | `AI_PROVIDER`                   | Optional default provider id (`openai`)      |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Optional Google Analytics 4 measurement ID   |
 
-Without `OPENAI_API_KEY` the app still builds and runs — the validator page
-shows a clear "not configured" notice instead of failing.
+Without `OPENAI_API_KEY` the app still builds and runs — the validator and plan
+pages show a clear "not configured" notice instead of failing.
 
 ### 2. Apply the database schema
 
@@ -71,8 +73,12 @@ Supabase **SQL Editor**, or use the CLI (`supabase db push`):
 3. [`0003_sprint4_ai_platform.sql`](./supabase/migrations/0003_sprint4_ai_platform.sql)
    — `ai_workflows`, `ai_prompt_versions`, `ai_responses`, `ai_usage_logs`, plus
    additive columns on `ai_requests` and `validation_reports`.
+4. [`0004_sprint5_workspaces_and_plans.sql`](./supabase/migrations/0004_sprint5_workspaces_and_plans.sql)
+   — `workspaces`, `workspace_members`, the three business-plan tables, the
+   membership RLS helpers, and a backfill that gives every existing user a
+   personal workspace.
 
-All three are additive and idempotent, and each depends on the one before it, so
+All four are additive and idempotent, and each depends on the one before it, so
 apply them in order. Then sync the workflow catalog:
 
 ```bash
@@ -85,6 +91,42 @@ In Supabase **Authentication → URL Configuration**, add your site URL and
 `…/auth/confirm` and `…/auth/callback` as redirect URLs. Email confirmation is
 on by default; disable it under **Authentication → Providers → Email** if you
 want instant sign-in during local development.
+
+## Sprint 5 — Business Plans & Workspaces
+
+### Workspace foundation
+
+`Workspace → Members → Projects → Business Ideas → Business Plans → Reports`.
+
+Every user gets a personal workspace, created by the migration for existing
+accounts and lazily on first read for new ones. Roles are **Owner, Admin, Member
+and Viewer**, enforced by Row Level Security through `security definer`
+membership helpers; `features/workspaces/roles.ts` mirrors them so the UI can
+hide what a Viewer cannot do. `/workspace` shows the workspace, your role, the
+member roster and what it contains.
+
+Invitations, role changes and shared workspaces are collaboration features and
+are **not** in this sprint — but the role model is already enforced in the
+database, so they become UI plus an invitation flow rather than a schema change.
+
+### Business Plan Generator
+
+Describe the business once; get the eleven sections from `BUSINESS-PLAN-SPEC.md`
+— executive summary, market analysis, customer persona, competition, business
+model, marketing, operations, financials, funding, risks and roadmap.
+
+- **Every section is editable** in place, and **versioned**: each save appends a
+  revision, and any earlier revision can be restored.
+- **PDF export** reuses the Sprint 4 PDF Engine unchanged.
+- The feature adds **no AI logic**. It contributes an input schema, a versioned
+  prompt, an output schema, a section catalog, a registry entry and its own
+  persistence — execution, retries, validation, history, usage tracking and both
+  renderers are inherited.
+
+`/plans` · `/plans/new` · `/plans/[id]`
+
+See [`MIGRATION-NOTES-SPRINT5.md`](./MIGRATION-NOTES-SPRINT5.md) for decisions
+and known gaps.
 
 ## Sprint 4 — AI Platform Core
 
@@ -147,17 +189,21 @@ consumer of the platform above: its entire presentation layer is
 
 ### REST API
 
-| Method | Route                  | Purpose                                     |
-| ------ | ---------------------- | ------------------------------------------- |
-| GET    | `/api/ai/workflows`    | Registered workflows + configuration status |
-| GET    | `/api/ai/history`      | Execution history (`?workflow=`, `?limit=`) |
-| GET    | `/api/ai/history/:id`  | One run, with its input and output JSON     |
-| GET    | `/api/ai/usage`        | Token, duration and cost metrics (`?days=`) |
-| GET    | `/api/business-ideas`  | List submitted ideas                        |
-| POST   | `/api/business-ideas`  | Submit + run a validation                   |
-| GET    | `/api/reports`         | Report history                              |
-| GET    | `/api/reports/:id`     | One report + metadata                       |
-| GET    | `/api/reports/:id/pdf` | Download the PDF                            |
+| Method | Route                         | Purpose                                     |
+| ------ | ----------------------------- | ------------------------------------------- |
+| GET    | `/api/ai/workflows`           | Registered workflows + configuration status |
+| GET    | `/api/ai/history`             | Execution history (`?workflow=`, `?limit=`) |
+| GET    | `/api/ai/history/:id`         | One run, with its input and output JSON     |
+| GET    | `/api/ai/usage`               | Token, duration and cost metrics (`?days=`) |
+| GET    | `/api/business-plans`         | Plans in the caller's workspace             |
+| POST   | `/api/business-plans`         | Generate a plan from a brief                |
+| GET    | `/api/business-plans/:id`     | Plan, sections and revision counts          |
+| GET    | `/api/business-plans/:id/pdf` | Download the plan PDF                       |
+| GET    | `/api/business-ideas`         | List submitted ideas                        |
+| POST   | `/api/business-ideas`         | Submit + run a validation                   |
+| GET    | `/api/reports`                | Report history                              |
+| GET    | `/api/reports/:id`            | One report + metadata                       |
+| GET    | `/api/reports/:id/pdf`        | Download the PDF                            |
 
 All are authenticated, rate-limited, and return the standard envelope:
 `{"success":false,"error":{"code","message"}}`.
@@ -165,15 +211,17 @@ All are authenticated, rate-limited, and return the standard envelope:
 ### Verification scripts
 
 ```bash
-npm test              # engine + report + PDF (no API key, database or network needed)
+npm test              # engine + report + plan + PDF (no API key, database or network needed)
 ```
 
-`test:engine` drives the real Workflow Manager against a mock provider —
-prompt loading, missing prompts, input and JSON validation, repair, retries,
-timeouts, API failures, injection handling, provider selection, cost estimation
-and rate limiting. `test:report` builds the shared document model and renders it
-to static HTML. `test:pdf` renders the same model and asserts a valid,
-multi-page, branded A4 PDF.
+`test:engine` drives the real Workflow Manager against a mock provider — for
+**both** registered workflows — covering prompt loading, missing prompts, input
+and JSON validation, repair, retries, timeouts, API failures, injection
+handling, provider selection, cost estimation and rate limiting. `test:report`
+and `test:plan` build each product's document model and render it to static
+HTML; `test:plan` also checks the section catalog against the schema and exports
+a PDF. `test:pdf` renders the validator report and asserts a valid, multi-page,
+branded A4 PDF.
 
 ## Sprints 1–2
 
@@ -229,7 +277,7 @@ multi-page, branded A4 PDF.
 | `npm run lint`           | ESLint                                     |
 | `npm run format`         | Format the repo with Prettier              |
 | `npm run format:check`   | Verify formatting (CI-friendly)            |
-| `npm test`               | Engine + report + PDF smoke tests          |
+| `npm test`               | Engine + report + plan + PDF smoke tests   |
 | `npm run sync:workflows` | Mirror the code registry into the database |
 
 ## Project structure
@@ -238,9 +286,10 @@ multi-page, branded A4 PDF.
 app/
   (marketing)/            Public marketing routes (Sprint 1)
   (auth)/                 login · register · forgot/reset-password · verify-email
-  (dashboard)/            Protected: dashboard · validator · reports · ai/history
-                          · projects · profile · settings (+ loading/error states)
-  api/                    ai/{workflows,history,usage} · business-ideas · reports
+  (dashboard)/            Protected: dashboard · validator · plans · reports
+                          · ai/history · projects · workspace · profile · settings
+  api/                    ai/{workflows,history,usage} · business-ideas
+                          · business-plans · reports
   auth/                   confirm + callback route handlers
 components/
   layout/site-nav.tsx     Shared marketing navbar
@@ -260,6 +309,9 @@ features/
     schemas/              Per-workflow Zod JSON contracts
     services/             Per-workflow orchestration
   business-ideas/         idea form + submit action
+  business-plans/         sections (the catalog) · data · actions · editor UI
+                          · report-definition (the plan's report model)
+  workspaces/             data (+ lazy bootstrap) · roles · actions · UI
   reports/                data · report-definition (the validator's report model)
   auth/  dashboard/  projects/  profile/  settings/
 lib/
@@ -267,7 +319,8 @@ lib/
   rate-limit.ts           Fixed-window limiter (AI runs + REST routes)
   supabase/               client · server · middleware (session) helpers
   auth/session.ts         getUser / requireUser guards
-  validations/            Zod schemas (auth, project, profile, business-idea)
+  validations/            Zod schemas (auth, project, profile, business-idea,
+                          business-plan, workspace) + shared text/field builders
   forms/action-state.ts   Shared Server Action result shape
 prompts/                  Versioned prompt markdown (business-validator/v1.md)
 scripts/                  Smoke tests (engine · report · pdf) + workflow sync
@@ -278,11 +331,13 @@ supabase/migrations/      SQL: tables, RLS, triggers, storage buckets
 
 ## Not in this sprint
 
-The Business Plan Generator, Marketing Strategy, Competitor Analysis, Funding
-Advisor, billing, credits and the admin panel are explicitly **out of scope**
-for Sprint 4. The platform exists so they can be built as thin consumers of it.
-See `PRODUCT-ROADMAP.md` for the sequence.
+Billing and collaboration are explicitly **out of scope** for Sprint 5, along
+with Marketing Strategy, Competitor Analysis, the Funding Advisor and the admin
+panel. The AI Platform exists so those become thin consumers of it — the
+Business Plan Generator is the worked example. See `PRODUCT-ROADMAP.md` for the
+sequence.
 
 Implementation decisions, trade-offs and known gaps are documented per sprint in
+[`MIGRATION-NOTES-SPRINT5.md`](./MIGRATION-NOTES-SPRINT5.md),
 [`MIGRATION-NOTES-SPRINT4.md`](./MIGRATION-NOTES-SPRINT4.md) and
 [`MIGRATION-NOTES-SPRINT3.md`](./MIGRATION-NOTES-SPRINT3.md).

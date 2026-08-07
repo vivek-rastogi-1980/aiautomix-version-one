@@ -3,3 +3,7 @@ node_modules
 out
 build
 package-lock.json
+
+# Architecture and sprint specs are reference material, not our source —
+# `npm run format` must not rewrite them.
+docs

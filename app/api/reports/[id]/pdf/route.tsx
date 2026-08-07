@@ -4,6 +4,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { getUser } from "@/lib/auth/session";
 import { getReport } from "@/features/reports/data";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
+import { toPdfFilename } from "@/features/ai/pdf/filename";
 import { ReportPdfDocument } from "@/features/ai/pdf/report-pdf";
 import { buildBusinessValidatorReportModel } from "@/features/reports/report-definition";
 import { apiError, rateLimitOrError } from "@/lib/api/response";
@@ -11,17 +12,6 @@ import { apiError, rateLimitOrError } from "@/lib/api/response";
 /** @react-pdf/renderer needs the Node runtime (not Edge). */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Turn a report title into a safe download filename. */
-function toFilename(title: string): string {
-  const slug =
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "business-validation-report";
-  return `${slug}-aiautomix-report.pdf`;
-}
 
 /**
  * GET /api/reports/:id/pdf — stream the branded A4 PDF for a report.
@@ -82,7 +72,7 @@ export async function GET(
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${toFilename(title)}"`,
+      "Content-Disposition": `attachment; filename="${toPdfFilename(title, "aiautomix-report")}"`,
       "Content-Length": String(buffer.length),
       "Cache-Control": "private, no-store",
     },

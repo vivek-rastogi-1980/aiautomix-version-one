@@ -4,19 +4,31 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { toPdfFilename } from "@/features/ai/pdf/filename";
 
 interface DownloadPdfButtonProps {
-  reportId: string;
+  /** Export endpoint, e.g. `/api/reports/123/pdf`. */
+  href: string;
+  /** Document title, used to name the downloaded file. */
   title: string;
+  /** Filename suffix, e.g. `aiautomix-report`. */
+  suffix: string;
+  label?: string;
 }
 
 /**
- * Downloads the report PDF from `/api/reports/:id/pdf`.
+ * Downloads a generated PDF from an export endpoint.
  *
  * Fetches as a blob rather than using a plain link so failures surface as an
- * inline message instead of navigating the user to a broken page.
+ * inline message instead of navigating the user to a broken page. Shared by
+ * every PDF the platform produces.
  */
-export function DownloadPdfButton({ reportId, title }: DownloadPdfButtonProps) {
+export function DownloadPdfButton({
+  href,
+  title,
+  suffix,
+  label = "Download PDF",
+}: DownloadPdfButtonProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +36,7 @@ export function DownloadPdfButton({ reportId, title }: DownloadPdfButtonProps) {
     setPending(true);
     setError(null);
     try {
-      const response = await fetch(`/api/reports/${reportId}/pdf`);
+      const response = await fetch(href);
       if (!response.ok) {
         throw new Error(`Request failed with ${response.status}`);
       }
@@ -33,7 +45,7 @@ export function DownloadPdfButton({ reportId, title }: DownloadPdfButtonProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-aiautomix-report.pdf`;
+      link.download = toPdfFilename(title, suffix);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -59,7 +71,7 @@ export function DownloadPdfButton({ reportId, title }: DownloadPdfButtonProps) {
         ) : (
           <Download className="size-4" />
         )}
-        {pending ? "Preparing…" : "Download PDF"}
+        {pending ? "Preparing…" : label}
       </Button>
       {error ? (
         <p role="alert" className="text-xs text-danger-soft">

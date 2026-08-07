@@ -1,12 +1,15 @@
+import type { BusinessPlanDocument } from "@/features/ai/schemas/business-plan";
 import type { BusinessValidatorReport } from "@/features/ai/schemas/business-validator";
+import { PLAN_SECTION_ORDER } from "@/features/business-plans/sections";
 import type { BusinessIdeaInput } from "@/lib/validations/business-idea";
+import type { BusinessPlanInput } from "@/lib/validations/business-plan";
 
 /**
  * Shared fixtures for the platform smoke tests.
  *
- * One sample input and one sample report, used by the engine, report and PDF
- * tests alike — so the three suites can never disagree about what a valid
- * workflow run looks like (CODING-STANDARDS: no duplicated logic).
+ * One sample input and one sample output per workflow, used by every suite —
+ * so they can never disagree about what a valid run looks like
+ * (CODING-STANDARDS: no duplicated logic).
  */
 
 export const VALID_IDEA_INPUT: BusinessIdeaInput = {
@@ -121,3 +124,38 @@ export const REPORT_SOURCE = {
   durationMs: 4200,
   tokens: 3100,
 } as const;
+
+// --- Sprint 5: Business Plan Generator ---------------------------------------
+
+export const VALID_PLAN_INPUT: BusinessPlanInput = {
+  businessName: "Acme Invoicing",
+  ideaDescription:
+    "A lightweight invoicing tool for small service businesses that automates reminders, reconciles payments, and files compliant e-invoices without an accountant.",
+  industry: "Fintech",
+  country: "India",
+  targetAudience: "Owners of service businesses with 5-50 staff",
+  businessModel: "saas",
+  currentStage: "idea",
+  estimatedBudget: 25000,
+  fundingGoal: "250,000 USD pre-seed",
+  timeline: "Launch in 6 months",
+  competitors: "Zoho Invoice, FreshBooks",
+  teamSummary: "Two founders — engineering and sales",
+  additionalNotes: "",
+  projectId: "",
+  businessIdeaId: "",
+};
+
+/**
+ * A generated plan. Section bodies are built from the catalog order so the
+ * fixture stays valid — and stays complete — if the section list ever changes.
+ */
+export const VALID_PLAN_DOCUMENT: BusinessPlanDocument = {
+  title: "Acme Invoicing Business Plan",
+  sections: Object.fromEntries(
+    PLAN_SECTION_ORDER.map((field) => [
+      field,
+      `This is the ${field} section of the Acme Invoicing plan. It runs to a couple of sentences so it clears the minimum length the schema enforces.\n\nA second paragraph exercises the paragraph splitting that both renderers rely on.`,
+    ]),
+  ) as BusinessPlanDocument["sections"],
+};

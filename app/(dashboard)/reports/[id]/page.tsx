@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getReport } from "@/features/reports/data";
 import { buildBusinessValidatorReportModel } from "@/features/reports/report-definition";
 import { ReportRenderer } from "@/features/ai/renderer/report-renderer";
-import { DownloadPdfButton } from "@/features/reports/download-pdf-button";
+import { DownloadPdfButton } from "@/features/ai/pdf/download-pdf-button";
 import { FormAlert } from "@/components/ui/form-message";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 
@@ -51,7 +51,13 @@ export default async function ReportPage({ params }: PageProps) {
             durationMs: record.duration_ms,
             tokens: record.tokens_used,
           })}
-          actions={<DownloadPdfButton reportId={record.id} title={title} />}
+          actions={
+            <DownloadPdfButton
+              href={`/api/reports/${record.id}/pdf`}
+              title={title}
+              suffix="aiautomix-report"
+            />
+          }
         />
       ) : (
         <FormAlert variant="error">

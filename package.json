@@ -11,8 +11,9 @@
     "format:check": "prettier --check .",
     "test:engine": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/engine-smoke.tsx",
     "test:report": "tsx --tsconfig scripts/tsconfig.json scripts/report-smoke.tsx",
+    "test:plan": "tsx --tsconfig scripts/tsconfig.json scripts/plan-smoke.tsx",
     "test:pdf": "tsx --tsconfig scripts/tsconfig.json scripts/pdf-smoke.tsx",
-    "test": "npm run test:engine && npm run test:report && npm run test:pdf",
+    "test": "npm run test:engine && npm run test:report && npm run test:plan && npm run test:pdf",
     "sync:workflows": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/sync-workflows.ts"
   },
   "dependencies": {

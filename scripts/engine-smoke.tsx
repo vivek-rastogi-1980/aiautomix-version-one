@@ -21,10 +21,20 @@ import type { AiProvider } from "@/features/ai/engine/types";
 import { runWorkflow } from "@/features/ai/engine/workflow-manager";
 import { createProvider } from "@/features/ai/providers";
 import { buildMessages, loadPrompt } from "@/features/ai/registry/prompts";
-import { BUSINESS_VALIDATOR_WORKFLOW } from "@/features/ai/registry/workflows";
+import {
+  BUSINESS_PLAN_WORKFLOW,
+  BUSINESS_VALIDATOR_WORKFLOW,
+} from "@/features/ai/registry/workflows";
+import type { BusinessPlanDocument } from "@/features/ai/schemas/business-plan";
 import type { BusinessValidatorReport } from "@/features/ai/schemas/business-validator";
 import { estimateCostUsd } from "@/features/ai/usage/pricing";
-import { VALID_IDEA_INPUT, VALID_REPORT } from "@/scripts/fixtures";
+import { PLAN_SECTION_COUNT } from "@/features/business-plans/sections";
+import {
+  VALID_IDEA_INPUT,
+  VALID_PLAN_DOCUMENT,
+  VALID_PLAN_INPUT,
+  VALID_REPORT,
+} from "@/scripts/fixtures";
 
 /** Provider stub that replays a scripted sequence of responses. */
 function mockProvider(responses: (string | Error)[]): AiProvider & {
@@ -242,6 +252,63 @@ async function main() {
       error instanceof AiError ? error.code : String(error),
     );
   }
+
+  // --- A second workflow proves the platform is actually reusable -----------
+  const planTemplate = await loadPrompt(BUSINESS_PLAN_WORKFLOW, "v1");
+  check(
+    "business-plan prompt loads all five sections",
+    Boolean(
+      planTemplate.system &&
+      planTemplate.developer &&
+      planTemplate.context &&
+      planTemplate.input &&
+      planTemplate.schema,
+    ),
+  );
+
+  const plan = await runWorkflow<BusinessPlanDocument>(
+    {
+      workflowId: BUSINESS_PLAN_WORKFLOW,
+      userId: "user-plan",
+      input: VALID_PLAN_INPUT,
+    },
+    mockProvider([JSON.stringify(VALID_PLAN_DOCUMENT)]),
+  );
+  check(
+    "business plan workflow executes",
+    plan.data.title === VALID_PLAN_DOCUMENT.title,
+  );
+  check(
+    "all eleven sections returned",
+    Object.keys(plan.data.sections).length === PLAN_SECTION_COUNT,
+    `sections=${Object.keys(plan.data.sections).length}`,
+  );
+  check(
+    "plan run is attributed to its own workflow",
+    plan.metadata.workflow === BUSINESS_PLAN_WORKFLOW &&
+      plan.metadata.workflowLabel === "Business Plan Generator",
+  );
+
+  const { roadmap: _omitted, ...incompleteSections } =
+    VALID_PLAN_DOCUMENT.sections;
+  await expectError(
+    "plan missing a section rejected",
+    "AI_VALIDATION_FAILED",
+    () =>
+      runWorkflow<BusinessPlanDocument>(
+        {
+          workflowId: BUSINESS_PLAN_WORKFLOW,
+          userId: "user-plan-incomplete",
+          input: VALID_PLAN_INPUT,
+        },
+        mockProvider([
+          JSON.stringify({
+            ...VALID_PLAN_DOCUMENT,
+            sections: incompleteSections,
+          }),
+        ]),
+      ),
+  );
 
   // --- Usage tracking -------------------------------------------------------
   const cost = estimateCostUsd("gpt-4o-mini-2024-07-18", {

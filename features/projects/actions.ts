@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getWorkspaceContext } from "@/features/workspaces/data";
 import { projectSchema } from "@/lib/validations/project";
 import type { ProjectStatus } from "@/types/database";
 import {
@@ -41,9 +42,13 @@ export async function createProjectAction(
     );
   }
 
+  // Sprint 5: new projects join the caller's workspace.
+  const { workspace } = await getWorkspaceContext(user.id);
+
   const supabase = await createClient();
   const { error } = await supabase.from("projects").insert({
     user_id: user.id,
+    workspace_id: workspace.id,
     name: parsed.data.name,
     description: parsed.data.description || null,
     status: parsed.data.status as ProjectStatus,
