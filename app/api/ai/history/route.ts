@@ -1,13 +1,6 @@
-import { type NextRequest } from "next/server";
-
 import { getAiRuns } from "@/features/ai/history/data";
-import { getUser } from "@/lib/auth/session";
-import {
-  apiError,
-  apiSuccess,
-  logApiError,
-  rateLimitOrError,
-} from "@/lib/api/response";
+import { apiSuccess } from "@/lib/api/response";
+import { withApiAuth } from "@/lib/api/route-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,23 +10,19 @@ export const dynamic = "force-dynamic";
  *
  * Query: `workflow` to filter by slug, `limit` to cap results.
  */
-export async function GET(request: NextRequest) {
-  const user = await getUser();
-  if (!user) return apiError("UNAUTHORIZED", "You must be signed in.", 401);
+export const GET = withApiAuth(
+  {
+    route: "GET /api/ai/history",
+    scope: "ai:history:list",
+    errorMessage: "Could not load AI history.",
+  },
+  async ({ user, request }) => {
+    const params = request.nextUrl.searchParams;
+    const workflow = params.get("workflow") ?? undefined;
+    const rawLimit = Number(params.get("limit"));
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
 
-  const limited = rateLimitOrError(user.id, "ai:history:list");
-  if (limited) return limited;
-
-  const params = request.nextUrl.searchParams;
-  const workflow = params.get("workflow") ?? undefined;
-  const rawLimit = Number(params.get("limit"));
-  const limit =
-    Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined;
-
-  try {
     return apiSuccess(await getAiRuns(user.id, { workflow, limit }));
-  } catch (error) {
-    logApiError("GET /api/ai/history", error);
-    return apiError("INTERNAL_ERROR", "Could not load AI history.", 500);
-  }
-}
+  },
+);

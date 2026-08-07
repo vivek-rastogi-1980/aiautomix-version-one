@@ -17,6 +17,7 @@ interface UserMenuProps {
 export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -25,13 +26,28 @@ export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
         setOpen(false);
       }
     };
+    // Dismissing by clicking away is a pointer affordance with no keyboard
+    // equivalent, so without Escape a keyboard user who opens this menu has no
+    // way to close it — they can only tab through every item. The WAI-ARIA menu
+    // pattern also expects focus to return to the trigger, otherwise it
+    // restarts from the top of the document.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"

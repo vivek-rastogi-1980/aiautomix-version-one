@@ -51,6 +51,25 @@ export {
 
 export { estimateCostUsd, formatCostUsd } from "@/features/ai/usage/pricing";
 
+/**
+ * Per-product orchestration entry points.
+ *
+ * These are the functions a consumer actually calls, so they belong on the
+ * contract: without them every caller had to reach past this module into
+ * `services/…`, which is why nothing imported the facade at all. Each is a thin
+ * consumer of `runWorkflow` above — they add domain persistence, never AI logic.
+ */
+export {
+  generateBusinessPlan,
+  type GeneratePlanOptions,
+  type PlanGenerationOutcome,
+} from "@/features/ai/services/business-plan";
+
+export {
+  validateBusinessIdea,
+  type ValidationOutcome,
+} from "@/features/ai/services/business-validator";
+
 export type {
   AiCompletion,
   AiCompletionRequest,

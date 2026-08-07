@@ -3,9 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { AiError, toAiError } from "@/features/ai/engine/errors";
-import { isPlatformConfigured } from "@/features/ai/providers";
-import { generateBusinessPlan } from "@/features/ai/services/business-plan";
+import {
+  AiError,
+  generateBusinessPlan,
+  isPlatformConfigured,
+  toAiError,
+} from "@/features/ai";
 import {
   getPlanSectionRow,
   getPlanVersion,

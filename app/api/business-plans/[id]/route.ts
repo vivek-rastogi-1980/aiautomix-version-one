@@ -1,32 +1,19 @@
-import { type NextRequest } from "next/server";
-
 import { getBusinessPlan } from "@/features/business-plans/data";
 import { getWorkspaceContext } from "@/features/workspaces/data";
-import { getUser } from "@/lib/auth/session";
-import {
-  apiError,
-  apiSuccess,
-  logApiError,
-  rateLimitOrError,
-} from "@/lib/api/response";
+import { apiError, apiSuccess } from "@/lib/api/response";
+import { withApiAuth } from "@/lib/api/route-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/business-plans/:id — a plan with its sections and revision counts. */
-export async function GET(
-  _request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
-  const user = await getUser();
-  if (!user) return apiError("UNAUTHORIZED", "You must be signed in.", 401);
-
-  const limited = rateLimitOrError(user.id, "business-plans:get");
-  if (limited) return limited;
-
-  const { id } = await context.params;
-
-  try {
+export const GET = withApiAuth<{ id: string }>(
+  {
+    route: "GET /api/business-plans/:id",
+    scope: "business-plans:get",
+    errorMessage: "Could not load the business plan.",
+  },
+  async ({ user, params: { id } }) => {
     const { workspace } = await getWorkspaceContext(user.id);
     const result = await getBusinessPlan(workspace.id, id);
     if (!result) return apiError("NOT_FOUND", "Business plan not found.", 404);
@@ -56,8 +43,5 @@ export async function GET(
         revisions: history.get(section.id)?.length ?? 0,
       })),
     });
-  } catch (error) {
-    logApiError("GET /api/business-plans/:id", error);
-    return apiError("INTERNAL_ERROR", "Could not load the business plan.", 500);
-  }
-}
+  },
+);

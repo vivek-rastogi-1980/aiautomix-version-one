@@ -256,6 +256,12 @@ branded A4 PDF.
 
 ## Architecture notes
 
+- **Every REST route goes through `withApiAuth`** (`lib/api/route-handler.ts`),
+  which supplies authentication, per-user rate limiting and error handling. A new
+  endpoint gets them by construction rather than by remembering to repeat them.
+- **Every AI product imports from `features/ai`** — the platform facade — not
+  from its internals. `runWorkflow` is the only execution path, and it owns
+  validation, rate limiting, prompts, retries, usage tracking and history.
 - **Reads** happen in Server Components via the Supabase server client (RLS
   applies). **Mutations** run through **Server Actions** with Zod validation and
   a consistent `ActionState` result shape (`lib/forms/action-state.ts`) — the
@@ -274,7 +280,7 @@ branded A4 PDF.
 | `npm run dev`            | Start the dev server                       |
 | `npm run build`          | Production build                           |
 | `npm run start`          | Serve the production build                 |
-| `npm run lint`           | ESLint                                     |
+| `npm run lint`           | ESLint over the whole repo (0 warnings)    |
 | `npm run format`         | Format the repo with Prettier              |
 | `npm run format:check`   | Verify formatting (CI-friendly)            |
 | `npm test`               | Engine + report + plan + PDF smoke tests   |
@@ -316,6 +322,7 @@ features/
   auth/  dashboard/  projects/  profile/  settings/
 lib/
   api/response.ts         Standard JSON success/error envelope
+  api/route-handler.ts    withApiAuth — auth + rate limit + error handling
   rate-limit.ts           Fixed-window limiter (AI runs + REST routes)
   supabase/               client · server · middleware (session) helpers
   auth/session.ts         getUser / requireUser guards
@@ -336,6 +343,10 @@ with Marketing Strategy, Competitor Analysis, the Funding Advisor and the admin
 panel. The AI Platform exists so those become thin consumers of it — the
 Business Plan Generator is the worked example. See `PRODUCT-ROADMAP.md` for the
 sequence.
+
+A production hardening pass over Sprints 1–5 — architecture, security,
+performance, accessibility and the review that found lint was only covering half
+the codebase — is written up in [`HARDENING-NOTES.md`](./HARDENING-NOTES.md).
 
 Implementation decisions, trade-offs and known gaps are documented per sprint in
 [`MIGRATION-NOTES-SPRINT5.md`](./MIGRATION-NOTES-SPRINT5.md),
