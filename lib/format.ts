@@ -12,24 +12,52 @@ export function initialsFrom(
   return letters.toUpperCase();
 }
 
+/**
+ * Every timestamp in the app renders in UTC.
+ *
+ * This is not cosmetic. These formatters run in Server Components *and* in
+ * client components that hydrate. `toLocaleDateString`/`toLocaleString` without
+ * an explicit `timeZone` use the ambient zone — the server's during SSR, the
+ * browser's during hydration — so the two disagree and React reports
+ * "some attributes of the server rendered HTML didn't match the client".
+ *
+ * Pinning the zone makes the output a pure function of the timestamp, which is
+ * what hydration requires. It also matches the PDF engine, which already stamps
+ * generation time in UTC.
+ *
+ * The trade-off is deliberate: users read UTC rather than local time. For
+ * audit-flavoured data — when a section was edited, when a run happened — an
+ * unambiguous zone is worth more than a familiar one. Showing local time
+ * safely would mean rendering timestamps only after mount, which costs a visible
+ * flash on every page.
+ */
+const DISPLAY_TIME_ZONE = "UTC";
+
 /** Format an ISO timestamp as a short, human date (e.g. "Aug 1, 2026"). */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: DISPLAY_TIME_ZONE,
   });
 }
 
-/** Format an ISO timestamp with the time of day (e.g. "Aug 1, 2026, 2:05 PM"). */
+/**
+ * Format an ISO timestamp with the time of day, labelled with its zone
+ * (e.g. "Aug 1, 2026, 2:05 PM UTC"). The label is not decoration — without it
+ * the displayed time would be silently wrong for every reader outside UTC.
+ */
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
+  const formatted = new Date(iso).toLocaleString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: DISPLAY_TIME_ZONE,
   });
+  return `${formatted} UTC`;
 }
 
 /** Format a millisecond duration for display (e.g. "820ms", "4.3s"). */

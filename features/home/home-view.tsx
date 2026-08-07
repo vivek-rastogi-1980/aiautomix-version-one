@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
+
+/**
+ * Layout effect on the client, plain effect on the server (where neither runs).
+ * The mount work adopts the real viewport; doing it in a layout effect applies
+ * it before paint, so a narrow visitor never sees a frame of desktop layout.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
 import { useMergedState } from "@/hooks/use-merged-state";
@@ -62,6 +70,9 @@ const PAGE_CSS = `
       .r-stat3 { flex-direction: column !important; }
       .r-stat3 > div { border-right: none !important; border-bottom: 1px solid rgba(10,11,15,0.14) !important; }
       .r-report2 { grid-template-columns: 1fr !important; }
+      /* Grid items default to min-width:auto, so they refuse to shrink below
+         their min-content and spill out of the single column instead. */
+      .r-report2 > * { min-width: 0 !important; }
       .r-team5 { grid-template-columns: repeat(2,1fr) !important; }
       .r-solutions { grid-template-columns: 1fr !important; }
       .r-solutions > div:first-child { font-size: 40px !important; }
@@ -71,6 +82,12 @@ const PAGE_CSS = `
       .r-team5 { grid-template-columns: 1fr !important; }
       .r-footer4 { grid-template-columns: 1fr !important; }
       [style*="padding:22px 64px"] { padding-left: 20px !important; padding-right: 20px !important; }
+      /* The product section and its report card keep desktop side padding
+         (64px + 48px = 224px of gutter), which on a 320px screen leaves less
+         room than the card's own content needs and pushes it past the right
+         edge. Same treatment as the nav rule above. */
+      [style*="padding:120px 64px 160px"] { padding-left: 20px !important; padding-right: 20px !important; }
+      [style*="padding:56px 48px"] { padding-left: 24px !important; padding-right: 24px !important; }
     }
     @media (max-height: 700px) {
       [data-zoom-img] { display: none !important; }
@@ -99,8 +116,14 @@ const INITIAL_STATE = {
   strategyBtnTop: 0,
   deferredReady: false,
   heroCardsReady: false,
-  viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1920,
-  viewportHeight: typeof window !== "undefined" ? window.innerHeight : 1080,
+  // Must NOT read `window` here. This object is the initial state for both the
+  // server render and the client's hydration render; branching on `typeof
+  // window` makes the two disagree (server 1920, client whatever the visitor's
+  // viewport is), and React reports a hydration mismatch it refuses to patch —
+  // leaving desktop-sized hero cards on a phone. The real viewport is applied
+  // in `componentDidMount`, after hydration has matched.
+  viewportWidth: 1920,
+  viewportHeight: 1080,
   heroTraveled: 0,
   activeAgentIndex: 0,
   mutedMap: {} as Record<string, any>,
@@ -256,13 +279,22 @@ class HomeController {
       }
     };
     this._onResize = () => {
+      // `clientWidth` is the layout viewport; `window.innerWidth` also counts
+      // the vertical scrollbar. Sizing elements from innerWidth overshoots by
+      // the scrollbar width and pushes the widest ones past the right edge —
+      // measured here as a 323px card inside a 320px viewport.
+      const doc = document.documentElement;
       this.setState({
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
+        viewportWidth: doc.clientWidth || window.innerWidth,
+        viewportHeight: doc.clientHeight || window.innerHeight,
       });
       requestAnimationFrame(this._measureBtn);
     };
     window.addEventListener("resize", this._onResize);
+    // Adopt the visitor's actual viewport now that hydration is done. Without
+    // this the page would stay at the 1920x1080 SSR assumption until the first
+    // resize event — which on a phone never comes.
+    this._onResize();
     requestAnimationFrame(this._measureBtn);
     // Below-the-fold image/video components (business plan, trending, news — 30+ image-slot
     // custom elements) all mounting in the SAME initial commit as the hero can overwhelm first paint.
@@ -1467,7 +1499,15 @@ class HomeController {
     ];
     const active = this.state.activeAgentIndex;
     const n = agentRoleDefs.length;
-    const stageMainW = Math.min(vw - 340, 980);
+    // The 340px gutter is a desktop assumption: it reserves room for the
+    // flanking ticket columns and the peeking side cards. Below 1100px the
+    // tickets are hidden (rScale === 0), so reserving that space no longer buys
+    // anything — it just starves the stage. `vw - 340` gave an 88px-wide card at
+    // 428px and went negative under 340px, which is why the hero looked broken
+    // on phones. Clamp to something that always fits the viewport instead.
+    const isCompactStage = vw < 1100;
+    const stageGutter = isCompactStage ? 48 : 340;
+    const stageMainW = Math.min(Math.max(vw - stageGutter, 240), 980);
     const stageMainH = stageMainW * (788 / 1576);
     const carouselStageStyle = {
       position: "relative",
@@ -1578,9 +1618,22 @@ class HomeController {
       if (rel < -n / 2) rel += n;
       const mainW = stageMainW;
       const mainH = mainW * (788 / 1576);
-      const sideOffset = mainW * 0.62;
+      // On desktop the neighbours rest at ±62% of the stage so they peek in from
+      // the edges. On compact they are hidden, so that offset buys nothing and
+      // costs a lot: `transform` is transitioned, so each advance drags the
+      // incoming card in from ±471px — right across and past a 428px screen,
+      // and the stage does not clip. Cross-fade in place instead: no card ever
+      // travels outside the stage.
+      const sideOffset = isCompactStage ? 0 : mainW * 0.62;
       const isMain = rel === 0;
-      const within = Math.abs(rel) <= 1;
+      // The side cards sit at ±62% of the stage width and the stage deliberately
+      // does not clip, so on desktop they peek in from the edges. On a narrow
+      // screen there is no margin for them to peek into — they are what pushes
+      // artwork past the right edge — so the compact layout shows only the
+      // active card. `within` also drives opacity, hit-testing and the click
+      // handler, so clearing it here retires the side cards completely rather
+      // than leaving invisible tap targets over the page.
+      const within = Math.abs(rel) <= 1 && !isCompactStage;
       const scale = isMain ? 1 : 0.8;
       const opacity = isMain ? 1 : within ? 0.45 : 0;
       const zIndex = isMain ? 3 : 2 - Math.abs(rel);
@@ -2917,7 +2970,7 @@ function usePageVals() {
   const ctrl = ref.current;
   ctrl.state = state;
   ctrl.setState = setState;
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     ctrl.componentDidMount();
     return () => ctrl.componentWillUnmount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5901,8 +5954,14 @@ export function HomeView() {
           style={{
             background: "#08090C",
             padding: "140px 64px 40px",
-            borderTop:
-              "1px solid rgba(255,255,255,0.06)); position:relative; z-index:3; overflow:hidden;",
+            // These four were previously collapsed into the `borderTop` string,
+            // complete with a stray `)`. That made the border value invalid — so
+            // no border rendered — and silently discarded the other three, which
+            // the footer's absolutely-positioned glow relies on.
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            position: "relative",
+            zIndex: 3,
+            overflow: "hidden",
           }}
         >
           <div

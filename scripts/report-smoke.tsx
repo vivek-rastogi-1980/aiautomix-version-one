@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReportRenderer } from "@/features/ai/renderer/report-renderer";
 import { navigableSections } from "@/features/ai/renderer/types";
 import { buildBusinessValidatorReportModel } from "@/features/reports/report-definition";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { REPORT_SOURCE } from "@/scripts/fixtures";
 
 const results: string[] = [];
@@ -23,6 +24,27 @@ function check(name: string, condition: boolean, detail = "") {
 }
 
 function main(): void {
+  // --- Timestamp determinism ------------------------------------------------
+  // Regression guard for a hydration mismatch: formatters without a pinned
+  // `timeZone` render the server's zone during SSR and the browser's during
+  // hydration. These assertions fail on any machine not already set to UTC,
+  // which is exactly the divergence React complains about.
+  const instant = "2026-08-03T02:30:00.000Z";
+  check(
+    "formatDateTime is timezone-independent",
+    formatDateTime(instant) === "Aug 3, 2026, 2:30 AM UTC",
+    formatDateTime(instant),
+  );
+  check(
+    "formatDateTime labels its zone",
+    formatDateTime(instant).endsWith(" UTC"),
+  );
+  check(
+    "formatDate is timezone-independent",
+    formatDate(instant) === "Aug 3, 2026",
+    formatDate(instant),
+  );
+
   const model = buildBusinessValidatorReportModel({ ...REPORT_SOURCE });
 
   // --- Document model -------------------------------------------------------
