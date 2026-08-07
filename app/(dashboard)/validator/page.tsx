@@ -5,7 +5,7 @@ import { History } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getProjects } from "@/features/projects/data";
 import { IdeaForm } from "@/features/business-ideas/idea-form";
-import { isPlatformConfigured } from "@/features/ai/providers";
+import { isPlatformConfigured } from "@/features/ai";
 import { FormAlert } from "@/components/ui/form-message";
 
 export const metadata: Metadata = {

@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth/session";
 import { businessIdeaSchema } from "@/lib/validations/business-idea";
-import { validateBusinessIdea } from "@/features/ai/services/business-validator";
-import { AiError, toAiError } from "@/features/ai/engine/errors";
-import { isPlatformConfigured } from "@/features/ai/providers";
+import {
+  AiError,
+  isPlatformConfigured,
+  toAiError,
+  validateBusinessIdea,
+} from "@/features/ai";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
 import {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { FormAlert } from "@/components/ui/form-message";
-import { isPlatformConfigured } from "@/features/ai/providers";
+import { isPlatformConfigured } from "@/features/ai";
 import { PlanForm } from "@/features/business-plans/plan-form";
 import { getBusinessIdeas } from "@/features/reports/data";
 import { getProjects } from "@/features/projects/data";
