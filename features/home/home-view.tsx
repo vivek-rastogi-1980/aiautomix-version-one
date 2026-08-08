@@ -11,6 +11,7 @@ const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
+import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars -- faithful re-host of the design's imperative animation controller; see MIGRATION-NOTES.md */
 
@@ -142,14 +143,32 @@ const INITIAL_STATE = {
   waitlistJoined: false,
   strategyModalOpen: false,
   strategySubmitted: false,
-  strategyForm: { name: "", email: "", company: "", phone: "", goal: "" },
+  // `website` is the honeypot: hidden from users, so a human always leaves it
+  // empty and a naive bot fills it. Kept in form state so the existing field
+  // setters work on it unchanged.
+  strategyForm: {
+    name: "",
+    email: "",
+    company: "",
+    phone: "",
+    goal: "",
+    website: "",
+  },
   strategyNameError: "",
   strategyEmailError: "",
+  strategySubmitError: "",
   validateModalOpen: false,
   validateSubmitted: false,
-  validateForm: { name: "", email: "", idea: "", industry: "" },
+  validateForm: {
+    name: "",
+    email: "",
+    idea: "",
+    industry: "",
+    website: "",
+  },
   validateNameError: "",
   validateEmailError: "",
+  validateSubmitError: "",
   strategyBtnTop: 0,
   deferredReady: false,
   heroCardsReady: false,
@@ -2902,29 +2921,36 @@ class HomeController {
           });
           return;
         }
-        const body =
-          "Name: " +
-          f.name +
-          "\nEmail: " +
-          f.email +
-          "\nCompany: " +
-          (f.company || "-") +
-          "\nPhone: " +
-          (f.phone || "-") +
-          "\nGoal: " +
-          (f.goal || "-");
-        const mailto =
-          "mailto:vivek.rastogi.work@gmail.com?subject=" +
-          encodeURIComponent(
-            "New Free AI Strategy Session Request — " + f.name,
-          ) +
-          "&body=" +
-          encodeURIComponent(body);
-        window.location.href = mailto;
+        // Optimistic: show the confirmation immediately, then persist. The
+        // previous handler did the same thing but via `mailto:`, which meant
+        // the success state was shown even when no mail client existed and the
+        // lead was simply lost. Now the success state is provisional and gets
+        // corrected if the request actually fails.
         this.setState({
           strategySubmitted: true,
           strategyNameError: "",
           strategyEmailError: "",
+          strategySubmitError: "",
+        });
+
+        void submitLead(
+          "strategy-session",
+          {
+            name: f.name,
+            email: f.email,
+            company: f.company,
+            phone: f.phone,
+            message: f.goal,
+          },
+          f.website,
+        ).then((result) => {
+          if (result.ok) return;
+          // Reopen the form with the error rather than leaving the visitor
+          // believing a lost lead was received.
+          this.setState({
+            strategySubmitted: false,
+            strategySubmitError: result.message,
+          });
         });
       },
       validateModalOpen: this.state.validateModalOpen,
@@ -2973,27 +2999,28 @@ class HomeController {
           });
           return;
         }
-        const body =
-          "Name: " +
-          f.name +
-          "\nEmail: " +
-          f.email +
-          "\nIndustry: " +
-          (f.industry || "-") +
-          "\nIdea: " +
-          (f.idea || "-");
-        const mailto =
-          "mailto:contact@aiautomix.com?subject=" +
-          encodeURIComponent(
-            "New Business Idea Validation Request — " + f.name,
-          ) +
-          "&body=" +
-          encodeURIComponent(body);
-        window.location.href = mailto;
         this.setState({
           validateSubmitted: true,
           validateNameError: "",
           validateEmailError: "",
+          validateSubmitError: "",
+        });
+
+        void submitLead(
+          "idea-validation",
+          {
+            name: f.name,
+            email: f.email,
+            company: f.industry,
+            message: f.idea,
+          },
+          f.website,
+        ).then((result) => {
+          if (result.ok) return;
+          this.setState({
+            validateSubmitted: false,
+            validateSubmitError: result.message,
+          });
         });
       },
     };

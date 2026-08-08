@@ -3,6 +3,7 @@
 import { Fragment, type ChangeEvent } from "react";
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
+import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
 
 const PAGE_CSS = `
@@ -35,6 +36,7 @@ function usePageVals() {
     cEmail: "",
     cMsg: "",
     contactSubmitted: false,
+    contactError: "",
     menuOpen: false,
   });
   const goConsult = () => {
@@ -449,19 +451,19 @@ function usePageVals() {
     contactSubmitted: state.contactSubmitted,
     submitContact: () => {
       if (!state.cName.trim() || !state.cEmail.trim()) return;
-      const body =
-        "Name: " +
-        state.cName +
-        "\nEmail: " +
-        state.cEmail +
-        "\nMessage: " +
-        state.cMsg;
-      window.location.href =
-        "mailto:contact@aiautomix.com?subject=" +
-        encodeURIComponent("Website Project Inquiry — " + state.cName) +
-        "&body=" +
-        encodeURIComponent(body);
-      setState({ contactSubmitted: true });
+
+      // Was a `mailto:` handoff that reported success regardless of whether
+      // anything was sent. Persists through /api/leads now.
+      setState({ contactSubmitted: true, contactError: "" });
+
+      void submitLead("contact", {
+        name: state.cName,
+        email: state.cEmail,
+        message: state.cMsg,
+      }).then((result) => {
+        if (result.ok) return;
+        setState({ contactSubmitted: false, contactError: result.message });
+      });
     },
   };
 }

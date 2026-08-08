@@ -3,6 +3,7 @@
 import { Fragment, type ChangeEvent } from "react";
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
+import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
 import { SiteNav } from "@/components/layout/site-nav";
 
@@ -21,9 +22,12 @@ body { margin: 0; background: #0A0B0F; }
 type FieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 function usePageVals() {
   const [state, setState] = useMergedState({
-    form: { name: "", email: "", company: "", message: "" },
+    // `website` is the honeypot — hidden from users, so a human leaves it empty
+    // and a naive bot fills it.
+    form: { name: "", email: "", company: "", message: "", website: "" },
     nameError: "",
     emailError: "",
+    submitError: "",
     submitted: false,
   });
 
@@ -74,22 +78,30 @@ function usePageVals() {
         setState({ nameError: nameErr, emailError: emailErr });
         return;
       }
-      const body =
-        "Name: " +
-        f.name +
-        "\nEmail: " +
-        f.email +
-        "\nCompany: " +
-        (f.company || "-") +
-        "\nMessage: " +
-        (f.message || "-");
-      const mailto =
-        "mailto:contact@aiautomix.com?subject=" +
-        encodeURIComponent("New Contact Form Message — " + f.name) +
-        "&body=" +
-        encodeURIComponent(body);
-      window.location.href = mailto;
-      setState({ submitted: true, nameError: "", emailError: "" });
+      // Was a `mailto:` handoff, which showed this success state whether or not
+      // a mail client existed — so every visitor on mobile or webmail saw
+      // "sent" while the message went nowhere. Now the confirmation is
+      // provisional and reverts if the request genuinely fails.
+      setState({
+        submitted: true,
+        nameError: "",
+        emailError: "",
+        submitError: "",
+      });
+
+      void submitLead(
+        "contact",
+        {
+          name: f.name,
+          email: f.email,
+          company: f.company,
+          message: f.message,
+        },
+        f.website,
+      ).then((result) => {
+        if (result.ok) return;
+        setState({ submitted: false, submitError: result.message });
+      });
     },
   };
 }
