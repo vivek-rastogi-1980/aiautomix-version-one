@@ -1026,7 +1026,6 @@ class HomeController {
     const colH = Math.min(vh - colTop - 40, 1560) * 1.5;
     const cardH = Math.round((colH - colGap * 5) / 6) + 10;
     const cardWSide = Math.round(375 * rScale);
-
     const stageStyle = {
       position: "absolute",
       inset: 0,
@@ -1228,7 +1227,7 @@ class HomeController {
           },
           innerStyle: {
             width: "100%",
-            height: "100%",
+            height: "205px",
             borderRadius: "16px",
             overflow: "visible",
             position: "relative",
@@ -2451,7 +2450,7 @@ class HomeController {
       position: "relative",
       display: "inline-flex",
       borderRadius: "28px",
-      marginTop: "50px",
+      marginTop: "15px",
       marginBottom: "50px",
       zIndex: 2,
     };
