@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "Validate Your Business Idea Free | AIAutomix",
     description:
       "Five AI agents. One honest verdict. Validate your business idea free in minutes.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

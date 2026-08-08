@@ -46,6 +46,43 @@ const PAGE_CSS = `
     [data-rocket-btn]:hover .rocket-icon { transform: translateY(-30px) scale(2.4); }
     [data-rocket-btn]:hover .rocket-plume { transform: translateX(-50%) scaleY(1); opacity: 1; animation: plumeFlicker 0.35s ease-in-out infinite; }
     @keyframes plumeFlicker { 0%,100% { height: 20px; } 50% { height: 26px; } }
+
+    /* --- Branded scrollbar for scrollable overlays (the modals) -------------
+       The default OS scrollbar renders as a grey system chrome bar against the
+       dark modal, which is the one un-designed surface in the overlay. This
+       keeps the same affordance — real scrollbar, real drag target, native
+       keyboard and wheel behaviour — and only restyles it: brand gradient
+       thumb, inset track, and a widen-plus-brighten transition on hover so it
+       recedes while reading and becomes obvious the moment you reach for it. */
+    .aim-scroll { scrollbar-width: thin; scrollbar-color: rgba(124,92,255,0.55) transparent; }
+    .aim-scroll::-webkit-scrollbar { width: 10px; }
+    .aim-scroll::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.03);
+      border-radius: 100px;
+      margin: 8px 0;
+    }
+    .aim-scroll::-webkit-scrollbar-thumb {
+      border-radius: 100px;
+      background: linear-gradient(180deg, #7C5CFF 0%, #F0219E 100%);
+      /* Transparent border + background-clip insets the thumb inside the track
+         without changing the hit area, so it stays easy to grab. */
+      border: 3px solid transparent;
+      background-clip: content-box;
+      transition: background 0.25s ease, border-width 0.2s ease;
+    }
+    .aim-scroll::-webkit-scrollbar-thumb:hover {
+      border-width: 2px;
+      background: linear-gradient(180deg, #9B80FF 0%, #FF3FB4 100%);
+      background-clip: content-box;
+    }
+    .aim-scroll::-webkit-scrollbar-thumb:active {
+      border-width: 1px;
+      background: linear-gradient(180deg, #B7A3FF 0%, #FF63C6 100%);
+      background-clip: content-box;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .aim-scroll::-webkit-scrollbar-thumb { transition: none; }
+    }
     @keyframes strategySweep {
       0% { transform: translateX(-160%) skewX(-20deg); opacity: 0; }
       4% { opacity: 1; }
@@ -989,7 +1026,6 @@ class HomeController {
     const colH = Math.min(vh - colTop - 40, 1560) * 1.5;
     const cardH = Math.round((colH - colGap * 5) / 6) + 10;
     const cardWSide = Math.round(375 * rScale);
-
     const stageStyle = {
       position: "absolute",
       inset: 0,
@@ -1191,7 +1227,7 @@ class HomeController {
           },
           innerStyle: {
             width: "100%",
-            height: "100%",
+            height: "205px",
             borderRadius: "16px",
             overflow: "visible",
             position: "relative",
@@ -2414,7 +2450,7 @@ class HomeController {
       position: "relative",
       display: "inline-flex",
       borderRadius: "28px",
-      marginTop: "50px",
+      marginTop: "15px",
       marginBottom: "50px",
       zIndex: 2,
     };
@@ -3161,23 +3197,14 @@ export function HomeView() {
               />
             </div>
           </div>
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              transform: "translateX(-50%)",
-              fontFamily: "'Bricolage Grotesque',sans-serif",
-              fontWeight: "700",
-              fontSize: "17px",
-              letterSpacing: "-0.01em",
-              color: "#F4F3F7",
-              pointerEvents: "none",
-              opacity: "{{ navTitleOpacity }}",
-              transition: "opacity 0.25s ease",
-            }}
-          >
-            {"AI Automation Mix"}
-          </div>
+          {/*
+            The "AI Automation Mix" wordmark used to sit here, centred in the
+            nav. It now leads the hero heading instead — see the eyebrow above
+            the <h1>. Its opacity was bound to "{{ navTitleOpacity }}", an
+            unreplaced template placeholder that is not a valid CSS value, so
+            the intended scroll fade never ran and it simply sat at full opacity
+            on top of the logo.
+          */}
           <div
             style={{
               display: "flex",
@@ -3256,7 +3283,7 @@ export function HomeView() {
               <span style={asStyle(menuLinkArrowStyle)}>{"→"}</span>
             </span>{" "}
             <Link
-              href="/#news"
+              href="/news"
               style={asStyle(menuLinkStyle)}
               onMouseEnter={onMenuLinkEnter}
               onMouseLeave={onMenuLinkLeave}
@@ -3332,7 +3359,11 @@ export function HomeView() {
         </div>
         {validateModalOpen ? (
           <div style={asStyle(modalOverlayStyle)} onClick={closeValidateModal}>
-            <div style={asStyle(modalCardStyle)} onClick={stopPropagation}>
+            <div
+              className="aim-scroll"
+              style={asStyle(modalCardStyle)}
+              onClick={stopPropagation}
+            >
               <div
                 onClick={closeValidateModal}
                 style={asStyle(modalCloseStyle)}
@@ -3465,7 +3496,11 @@ export function HomeView() {
         ) : null}
         {strategyModalOpen ? (
           <div style={asStyle(modalOverlayStyle)} onClick={closeStrategyModal}>
-            <div style={asStyle(modalCardStyle)} onClick={stopPropagation}>
+            <div
+              className="aim-scroll"
+              style={asStyle(modalCardStyle)}
+              onClick={stopPropagation}
+            >
               <div
                 onClick={closeStrategyModal}
                 style={asStyle(modalCloseStyle)}
@@ -3581,6 +3616,25 @@ export function HomeView() {
         >
           <div ref={heroInnerRef} style={asStyle(heroInnerStyle)}>
             <div style={asStyle(heroGlowStyle)}></div>
+            {/*
+              Brand eyebrow, relocated from the nav bar. Sized and spaced to
+              read as a kicker above the headline rather than competing with
+              it — the <h1> stays the largest thing in the hero.
+            */}
+            <div
+              style={{
+                fontFamily: "'Bricolage Grotesque',sans-serif",
+                fontWeight: "700",
+                fontSize: "clamp(13px,1.2vw,16px)",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "#B9B5C9",
+                margin: "0 0 18px",
+                zIndex: "2",
+              }}
+            >
+              {"AI Automation Mix"}
+            </div>
             <h1
               style={{
                 fontFamily: "'Bricolage Grotesque',sans-serif",

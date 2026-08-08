@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "24×7 Working AI Agents | AIAutomix",
     description:
       "Hire a full team of AI agents that work around the clock — deployed in 14 days.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

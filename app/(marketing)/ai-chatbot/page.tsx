@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "AI Chatbot for Instant Customer Support | AIAutomix",
     description:
       "Answer 70% of support tickets instantly. Trained on your docs, live in minutes.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

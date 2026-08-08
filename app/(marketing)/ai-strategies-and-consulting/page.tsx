@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: "AI Strategies & Consulting | AIAutomix",
     description:
       "A clear roadmap for where automation pays off first — backed by cited data.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

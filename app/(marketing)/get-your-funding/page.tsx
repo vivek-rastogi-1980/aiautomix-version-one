@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Get Your Funding | AIAutomix",
     description:
       "An investor-ready pitch deck, financial model, and cited market data — assembled automatically.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };

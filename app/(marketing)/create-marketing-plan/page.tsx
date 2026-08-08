@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "Create a Marketing Plan with AI | AIAutomix",
     description:
       "Describe your business and AIAutomix drafts a full marketing plan — channels, messaging, and a content calendar — in minutes.",
-    images: ["https://staging.aiautomix.com/assets/logo-ice2.png"],
+    images: ["/assets/logo-ice2.png"],
   },
   twitter: { card: "summary_large_image" },
 };
