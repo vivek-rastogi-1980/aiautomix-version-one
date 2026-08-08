@@ -48,6 +48,32 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  /**
+   * One canonical host (P0-5).
+   *
+   * With both apex and `www` attached to the same Vercel project, each page
+   * exists at two URLs that both return 200. `rel=canonical` asks search
+   * engines to pick one; a 308 removes the choice, and also stops sessions and
+   * analytics being split across two origins.
+   *
+   * `www` is canonical because it is what `NEXT_PUBLIC_SITE_URL`, the sitemap
+   * and the Supabase Auth redirect URLs all use.
+   *
+   * The `has` host condition is what prevents a redirect loop: this rule only
+   * matches when the incoming Host is exactly the apex, so the `www` response
+   * it redirects to no longer matches and is served normally. Vercel preview
+   * URLs (`*.vercel.app`) do not match either, so previews keep working.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "aiautomix.com" }],
+        destination: "https://www.aiautomix.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
