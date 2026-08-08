@@ -7,6 +7,7 @@ import {
   NEWS_ARTICLES,
   type NewsArticle,
 } from "@/features/news/news-data";
+import { buildNewsBreadcrumb } from "@/features/news/news-schema";
 
 const PAGE_CSS = `
 body { margin: 0; background: #0A0B0F; }
@@ -85,6 +86,12 @@ export function NewsIndexView() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildNewsBreadcrumb()),
+        }}
+      />
       <style dangerouslySetInnerHTML={{ __html: PAGE_CSS }} />
       <div
         style={{

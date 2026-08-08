@@ -11,6 +11,7 @@ const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
+import { trackEvent } from "@/lib/analytics/events";
 import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars -- faithful re-host of the design's imperative animation controller; see MIGRATION-NOTES.md */
@@ -2890,13 +2891,17 @@ class HomeController {
       nameError: this.state.strategyNameError,
       emailError: this.state.strategyEmailError,
       fieldErrorStyle,
-      openStrategyModal: () =>
+      openStrategyModal: () => {
+        // Paired with `book_consultation` on success, so GA4 shows the drop-off
+        // between opening the form and completing it.
+        trackEvent("ai_demo_started", { source: "strategy-session" });
         this.setState({
           strategyModalOpen: true,
           strategySubmitted: false,
           strategyNameError: "",
           strategyEmailError: "",
-        }),
+        });
+      },
       strategyBtnRef: this.strategyBtnRef,
       closeStrategyModal: () => this.setState({ strategyModalOpen: false }),
       stopPropagation: (e?: any) => e.stopPropagation(),
@@ -2944,7 +2949,13 @@ class HomeController {
           },
           f.website,
         ).then((result) => {
-          if (result.ok) return;
+          if (result.ok) {
+            // Fired on confirmed persistence, not on click — an event that
+            // counts attempts rather than captured leads would overstate the
+            // conversion rate. Carries no field values; see lib/analytics.
+            trackEvent("book_consultation", { source: "strategy-session" });
+            return;
+          }
           // Reopen the form with the error rather than leaving the visitor
           // believing a lost lead was received.
           this.setState({
@@ -2965,7 +2976,8 @@ class HomeController {
       validateEmailInputStyle: this.state.validateEmailError
         ? errorBorderStyle
         : modalInputStyle,
-      openValidateModal: () =>
+      openValidateModal: () => {
+        trackEvent("idea_validator_started", { source: "home-validate-modal" });
         this.setState((s: any) => ({
           validateModalOpen: true,
           validateSubmitted: false,
@@ -2975,7 +2987,8 @@ class HomeController {
             ...s.validateForm,
             idea: s.ideaInput || s.validateForm.idea,
           },
-        })),
+        }));
+      },
       closeValidateModal: () => this.setState({ validateModalOpen: false }),
       onValidateField_name: validateFieldSetter("name"),
       onValidateField_email: validateFieldSetter("email"),
@@ -3016,7 +3029,12 @@ class HomeController {
           },
           f.website,
         ).then((result) => {
-          if (result.ok) return;
+          if (result.ok) {
+            trackEvent("idea_validator_completed", {
+              source: "home-validate-modal",
+            });
+            return;
+          }
           this.setState({
             validateSubmitted: false,
             validateSubmitError: result.message,

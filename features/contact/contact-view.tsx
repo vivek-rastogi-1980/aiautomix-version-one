@@ -3,6 +3,7 @@
 import { Fragment, type ChangeEvent } from "react";
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
+import { trackContactClick, trackEvent } from "@/lib/analytics/events";
 import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
 import { SiteNav } from "@/components/layout/site-nav";
@@ -99,7 +100,10 @@ function usePageVals() {
         },
         f.website,
       ).then((result) => {
-        if (result.ok) return;
+        if (result.ok) {
+          trackEvent("contact_form_submit", { source: "contact" });
+          return;
+        }
         setState({ submitted: false, submitError: result.message });
       });
     },
@@ -236,6 +240,7 @@ export function ContactView() {
                   </div>
                   <a
                     href="mailto:contact@aiautomix.com"
+                    onClick={() => trackContactClick("email", "contact-page")}
                     style={{ fontSize: "15px", color: "#F4F3F7" }}
                   >
                     {"contact@aiautomix.com"}
