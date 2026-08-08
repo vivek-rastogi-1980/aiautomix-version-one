@@ -701,7 +701,7 @@ export function WebsiteDevelopmentView() {
                 {"About"}
               </Link>{" "}
               <Link
-                href="/#news"
+                href="/news"
                 style={{
                   fontFamily: "'Bricolage Grotesque',sans-serif",
                   fontWeight: "800",

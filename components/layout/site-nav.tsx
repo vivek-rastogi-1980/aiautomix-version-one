@@ -234,7 +234,7 @@ export function SiteNav() {
               {"About"}
             </Link>{" "}
             <Link
-              href="/#news"
+              href="/news"
               className="site-menu-link"
               style={{
                 fontFamily: "'Bricolage Grotesque',sans-serif",

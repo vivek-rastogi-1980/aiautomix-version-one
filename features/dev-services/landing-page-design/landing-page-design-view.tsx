@@ -687,7 +687,7 @@ export function LandingPageDesignView() {
               <span style={asStyle(menuLinkArrowStyle)}>{"→"}</span>
             </span>{" "}
             <Link
-              href="/#news"
+              href="/news"
               style={asStyle(menuLinkStyle)}
               onMouseEnter={onMenuLinkEnter}
               onMouseLeave={onMenuLinkLeave}
