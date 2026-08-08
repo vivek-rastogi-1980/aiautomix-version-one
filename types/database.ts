@@ -443,6 +443,50 @@ type BusinessPlanSectionUpdate = Partial<
   Omit<BusinessPlanSection, "id" | "plan_id" | "workspace_id" | "created_at">
 >;
 
+// --- Lead capture (migration 0005) ------------------------------------------
+
+export type LeadStatus = "new" | "contacted" | "qualified" | "archived";
+
+export type Lead = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  company: string | null;
+  message: string | null;
+  source: string;
+  landing_page: string | null;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  status: LeadStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+type LeadInsertRow = {
+  email: string;
+  source: string;
+  name?: string | null;
+  phone?: string | null;
+  company?: string | null;
+  message?: string | null;
+  landing_page?: string | null;
+  referrer?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
+  status?: LeadStatus;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 type BusinessPlanVersionInsert = {
   section_id: string;
   plan_id: string;
@@ -546,6 +590,12 @@ export interface Database {
         Row: BusinessPlanVersion;
         Insert: BusinessPlanVersionInsert;
         Update: Partial<BusinessPlanVersion>;
+        Relationships: [];
+      };
+      leads: {
+        Row: Lead;
+        Insert: LeadInsertRow;
+        Update: Partial<Lead>;
         Relationships: [];
       };
     };
