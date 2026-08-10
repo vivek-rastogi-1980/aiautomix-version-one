@@ -101,6 +101,23 @@ Debt discovered during the Sprint 5.5 stabilization review of Sprints 1–5.
 
 ## Open
 
+### TD-022 — Database reconciliation (DB-001 / DB-002)
+- **Severity:** Medium · **Area:** Database
+- **Evidence:** Live production disagreed with migration 0004 — `business_ideas`
+  and `validation_reports` had owner-only SELECT where 0004 specifies workspace
+  membership. Separately, six foreign keys had no index, two of them
+  `workspace_id` columns read inside RLS predicates.
+- **Impact:** 0004 no longer reproduced production; RLS evaluation on the plan
+  tables was a sequential scan.
+- **Fix:** `0006_sprint5_6_database_reconciliation.sql` — applied in a
+  transaction and verified (12 checks, including a re-apply to prove
+  idempotency). 0004 was not modified.
+- **Status:** RESOLVED · **Sprint:** 5.5 · 2026-08-10
+
+---
+
+## Open
+
 ### TD-009 — No CI pipeline
 - **Severity:** High · **Area:** DevOps
 - **Evidence:** No `.github/workflows`. Nothing runs typecheck, lint, tests or

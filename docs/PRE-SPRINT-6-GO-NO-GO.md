@@ -116,7 +116,7 @@ projects                writes  owner-only           reads  owner OR workspace m
 
 ### New findings
 
-**DB-001 — Schema drift between migration 0004 and the live database · MEDIUM**
+**DB-001 — Schema drift between migration 0004 and the live database · ~~MEDIUM~~ RESOLVED (0006, 2026-08-10)**
 Migration 0004 (lines 444–457) widens the SELECT policies on `business_ideas`
 and `validation_reports` to `auth.uid() = user_id OR is_workspace_member(...)`.
 **The live database has `auth.uid() = user_id` only.** `projects`, from the same
@@ -126,9 +126,11 @@ block, *does* carry the widened predicate — so the block applied partially.
 with no invitation flow there is no user-visible impact. But re-running 0004 on a
 fresh project would produce a different schema from production, which breaks
 reproducibility.
-**Required: a new migration `0006` to reconcile. Do not edit 0004.**
+**RESOLVED** by `0006_sprint5_6_database_reconciliation.sql`, applied in a
+transaction and verified: all three SELECT policies now include
+`is_workspace_member`. 0004 was not modified.
 
-**DB-002 — Six foreign keys without an index · MEDIUM**
+**DB-002 — Six foreign keys without an index · ~~MEDIUM~~ RESOLVED (0006, 2026-08-10)**
 `ai_usage_logs.request_id`, `business_plan_sections.workspace_id`,
 `business_plan_versions.edited_by`, `business_plan_versions.workspace_id`,
 `business_plans.ai_request_id`, `business_plans.business_idea_id`.
@@ -136,7 +138,7 @@ reproducibility.
 The two `workspace_id` columns matter most — they are **RLS predicate columns**,
 so every policy evaluation on those tables is a sequential scan. Invisible at 0
 rows; a real scaling problem once plans accumulate.
-**Required: index them in migration `0006`.**
+**RESOLVED** by 0006. Re-queried after applying: **zero unindexed foreign keys**.
 
 **DB-003 — One user has no profile row · LOW**
 `auth.users = 1`, `public.profiles = 0`. The trigger is correctly wired, so the
@@ -255,8 +257,8 @@ video makes LCP the likely weak point.
 | TD-010 SVG upload MIME trust | **HIGH** | Deferred — bounded to Supabase's own origin; fixing changes upload behaviour |
 | TD-015 No CSP | **HIGH** | Deferred — needs nonces on migrated inline blocks first |
 | TD-016 3 `npm audit` high | **HIGH** | Deferred — assessed unreachable; needs `next@16` major |
-| DB-001 Schema drift | **MEDIUM** | New — fail-safe direction, needs migration 0006 |
-| DB-002 Unindexed FKs | **MEDIUM** | New — RLS predicate columns; scaling risk |
+| ~~DB-001 Schema drift~~ | ~~MEDIUM~~ | **RESOLVED** — migration 0006 applied and verified |
+| ~~DB-002 Unindexed FKs~~ | ~~MEDIUM~~ | **RESOLVED** — migration 0006 applied and verified |
 | TD-011 No API/RLS tests | MEDIUM | Partially mitigated by the 36-check suite |
 | TD-012 Per-instance rate limiter | MEDIUM | Looser than configured under serverless |
 | TD-021 19 spec docs missing | MEDIUM | No review can check implementation against intent |
@@ -276,7 +278,7 @@ rationale. **TD-009 (no CI) does not** — it is deferred only by omission.
 | --- | ---: | --- |
 | Architecture | 92 | 0 circular deps; clean layering; facade enforced |
 | Security | 85 | 0 Critical open; RLS verified live; no CSP, SVG MIME |
-| Database | 88 | RLS 15/15, all definers pinned — **−12 for drift + unindexed FKs** |
+| Database | 96 | RLS 15/15, all definers pinned, drift reconciled, zero unindexed FKs (0006) |
 | AI Platform | 95 | Boundary verified by grep and by test |
 | API | 90 | 11/11 wrapped; 401s confirmed |
 | Testing | 66 | 126 checks — **but 3 core flows unverified, 2 mock-only** |
@@ -285,7 +287,9 @@ rationale. **TD-009 (no CI) does not** — it is deferred only by omission.
 | Documentation | 70 | 8 review docs — **19 referenced specs do not exist** |
 | Deployment | 65 | Runbook + rollback written; **no CI**; Vercel/DNS unverified |
 
-## **Overall: 81 / 100**
+## **Overall: 83 / 100**
+
+_Database 88 → 96 after migration 0006._
 
 Weighted toward launch-blocking categories (Security, Database, API, Deployment).
 
@@ -296,7 +300,7 @@ Weighted toward launch-blocking categories (Security, Database, API, Deployment)
 1. **No CI** — every gate here depends on someone remembering. Highest leverage.
 2. **Three core flows never verified** (section editing, version restore, logout).
 3. **Two AI flows never run against a real model** — only a mock provider.
-4. **Schema drift** — migration files no longer reproduce production.
+4. ~~**Schema drift**~~ — resolved by 0006; migration files reproduce production again.
 5. **Core Web Vitals unmeasured.**
 6. **19 spec documents absent** — Sprint 6 cannot be reviewed against a spec.
 
@@ -311,8 +315,9 @@ found, no data-isolation issue, build passes.
 
 1. **Add CI** running `typecheck`, `lint`, `test`, `build` — or record explicit
    CTO approval to defer TD-009.
-2. **Write migration `0006`** reconciling DB-001 (policy drift) and DB-002
-   (unindexed FK columns). Do not edit 0004.
+2. ~~**Write migration `0006`**~~ — **DONE 2026-08-10.** Created, applied in a
+   transaction, and verified with 12 checks including idempotency. 0004
+   untouched.
 3. **Exercise flows K, M and P once manually**, and run G and I against a real
    model at least once. These are the only unknowns that could hide a defect.
 
