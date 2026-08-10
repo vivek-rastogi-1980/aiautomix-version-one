@@ -177,7 +177,7 @@ personal → every caller Owner), but the invitation flow would have shipped a
 Viewer-can-write bug. **Fixed**, and now covered by a regression test that parses
 migration 0004 and fails if the TypeScript role predicates drift from the SQL.
 
-**Risk 2 — No CI.** Nothing enforces typecheck, lint, tests or build on push. The
+**Risk 2 — No CI. RESOLVED 2026-08-10** (`.github/workflows/ci.yml`, five jobs). Was: nothing enforced typecheck, lint, tests or build on push. The
 clean state depends entirely on someone remembering. This is the highest-leverage
 remaining item.
 
@@ -210,7 +210,7 @@ current document sizes; a scaling constraint later.
 | # | Blocker | Severity | Owner |
 | --- | --- | --- | --- |
 | ~~1~~ | ~~Migration 0005 unapplied~~ — **RESOLVED.** Applied and verified 2026-08-10: 18 structural checks plus a conclusive RLS proof (anon may INSERT; cannot SELECT, UPDATE or DELETE), and one lead submitted end-to-end through `/api/leads` with full UTM attribution. | ~~Critical~~ | Done |
-| 2 | **No CI** — nothing enforces the gates this review established | High | Engineering |
+| ~~2~~ | ~~**No CI**~~ — **RESOLVED**, `.github/workflows/ci.yml`. Branch protection still to enable by hand. | ~~High~~ | Done |
 | 3 | **16 spec documents missing** — Sprint 6 cannot be reviewed against a spec that does not exist | Medium | Product |
 | 4 | **No invitation flow** — the role model is enforced but unreachable; any Sprint 6 collaboration work starts here | Medium | Product |
 

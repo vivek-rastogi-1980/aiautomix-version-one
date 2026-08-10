@@ -106,7 +106,7 @@ at the definition, which is the right place for a constraint that surprising.
 
 | Item | Severity | Target |
 | --- | --- | --- |
-| No CI enforcing these gates | High | Sprint 6 |
+| ~~No CI enforcing these gates~~ | ~~High~~ | **RESOLVED** — `.github/workflows/ci.yml` |
 | `animation`/`animationDelay` shorthand conflict (~10 warnings) | Low | Sprint 6 |
 | 2 unreferenced exports (`getProject`, `deleteBusinessPlanAction`) | Low | When UI lands |
 | `home-view.tsx` size | Medium | Only if measurement justifies it |

@@ -118,16 +118,25 @@ Debt discovered during the Sprint 5.5 stabilization review of Sprints 1–5.
 
 ## Open
 
-### TD-009 — No CI pipeline
-- **Severity:** High · **Area:** DevOps
-- **Evidence:** No `.github/workflows`. Nothing runs typecheck, lint, tests or
-  build on push.
-- **Impact:** The clean state is unenforced; the next contributor can break it
-  silently. This is the highest-value remaining item — every other gate in this
-  document depends on someone remembering to run it.
-- **Fix:** GitHub Actions running `npm ci && npm run typecheck && npm run lint &&
-  npm test && npm run build`.
-- **Status:** OPEN · **Target:** Sprint 6
+### TD-009 — No CI pipeline · **RESOLVED**
+- **Severity:** ~~High~~ · **Area:** DevOps
+- **Evidence:** No `.github/workflows`. Nothing ran typecheck, lint, tests or
+  build on push. Two findings in this document are direct consequences: lint had
+  been covering under half the codebase unnoticed (TD-001), and `npm audit` had
+  never been run, which is how an unpatched critical Next.js RCE reached
+  production (TD-002).
+- **Fix:** `.github/workflows/ci.yml` — five parallel jobs (TypeScript, ESLint
+  + Prettier, tests, build, dependency audit) on every pull request and push to
+  `main`, aggregated into a single `CI` check for branch protection.
+  Requires no secrets: verified by removing `.env.local` and running the full
+  suite (126/126) and a production build, both of which pass.
+  The audit gate is set to `critical` rather than `high` so the three accepted
+  findings (SEC-008) do not fail every run and train people to ignore it;
+  verified that it exits 1 at `high` and 0 at `critical`, so the threshold is
+  real rather than inert.
+- **Status:** RESOLVED · **Sprint:** 5.5 · 2026-08-10
+- **Remaining manual step:** branch protection on `main` requiring the `CI`
+  check — a GitHub repository setting, not a repository file.
 
 ### TD-010 — SVG upload trusts client-declared MIME
 - **Severity:** High · **Area:** Security

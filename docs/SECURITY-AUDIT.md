@@ -214,7 +214,7 @@ browsers cannot issue cross-origin as a simple request.
 | ~~P0~~ | ~~No server-side validation on public forms~~ — **fixed** |
 | P1 | SVG upload trusts client-declared MIME |
 | P1 | No CSP (needs nonces first) |
-| P1 | No CI enforcing the quality gates |
+| ~~P1~~ | ~~No CI enforcing the quality gates~~ — **RESOLVED**, includes `npm audit --audit-level=critical` |
 | P2 | Rate limiter is per-instance; needs a shared store on serverless |
 | P2 | No tests covering API routes, Server Actions or RLS policies |
 | P2 | No server-side idempotency on lead submission |

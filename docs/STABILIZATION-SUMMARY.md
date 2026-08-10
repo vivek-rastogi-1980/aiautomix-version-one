@@ -172,8 +172,8 @@ migration 0004 and fails if TypeScript role predicates drift from the SQL.
 1. ~~**Migration 0005 unapplied**~~ — **RESOLVED 2026-08-10.** Applied and
    verified: 18 structural checks, a conclusive RLS proof, and one lead
    submitted end-to-end through `/api/leads` with full attribution.
-2. **No CI** — High. Nothing enforces the gates this review established. **This
-   is now the top blocker.**
+2. ~~**No CI**~~ — **RESOLVED 2026-08-10.** `.github/workflows/ci.yml`, five jobs on
+   every pull request, verified to require no secrets.
 3. **16 spec documents missing** — Medium. Sprint 6 cannot be reviewed against a
    spec that does not exist.
 4. **No invitation flow** — Medium. The role model is enforced in RLS but

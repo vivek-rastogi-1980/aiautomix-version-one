@@ -16,10 +16,10 @@ companion review documents.
 | **Database** | **100** | All 5 migrations applied and verified against the live database. 26 indexes covering every FK and RLS hot path; unique constraints prevent version collisions; CHECK on every enum; `security definer` functions correctly pin `search_path`. `leads` RLS conclusively proved insert-only for anon. |
 | **API** | **90** | All 11 routes through `withApiAuth`; consistent envelope; rate limiting throughout. −10: per-instance limiter; no route-level tests. |
 | **AI Platform** | **95** | One provider module, one `runWorkflow`; no component calls an LLM; versioned prompts with checksums; second product cost a fraction of the first. −5: platform service imports a feature module. |
-| **Testing** | **68** | 126 checks across 5 suites; new security suite proven to catch drift. −32: no coverage of API routes, RLS, or E2E; no CI. |
+| **Testing** | **74** | 126 checks across 5 suites, now enforced by CI; security suite proven to catch drift. −26: no coverage of API routes, RLS or E2E. |
 | **Accessibility** | **82** | Focus trap with restore; aria-labels; labelled forms; menu roles. −18: contrast unmeasured, heading hierarchy unverified across 26 migrated pages, no skip link. |
 | **Documentation** | **70** | Seven review docs, migration notes per sprint, exceptional in-code rationale. −30: **16 referenced spec documents do not exist**. |
-| **DevOps** | **65** | Reproducible build; env documented; runbook and rollback written; all migrations applied. −35: **no CI**, Vercel/DNS unverified. |
+| **DevOps** | **82** | Reproducible build; env documented; runbook and rollback written; all migrations applied; **CI on every PR**. −18: branch protection not yet enabled, Vercel/DNS unverified. |
 
 ---
 
@@ -31,9 +31,8 @@ Weighted toward the categories that block a launch (Security, Database, API,
 DevOps) rather than a flat mean.
 
 **The shape of this number:** the *code* is in good condition — architecture 92,
-AI platform 95, database 100. What drags the score is *operational*: no CI (65)
-and unmeasured Core Web Vitals. Those are hours of work, not weeks, and neither
-requires touching application code.
+AI platform 95, database 100, DevOps 82 now that CI exists. What is left is
+unmeasured Core Web Vitals and three core flows never exercised with a session.
 
 ---
 
@@ -56,8 +55,8 @@ All four are **MANUAL ACTION REQUIRED** and detailed in
 
 ## Top risks
 
-1. **No CI.** Every gate this review established — typecheck, lint, 126 tests,
-   build — depends on a human remembering. The single highest-leverage fix.
+1. ~~**No CI.**~~ **Resolved 2026-08-10.** Five jobs on every PR. One manual
+   step remains: enabling branch protection to require the `CI` check.
 2. ~~**Unapplied migration.**~~ **Resolved 2026-08-10** — applied and verified
    end-to-end against the live database.
 3. **Core Web Vitals unmeasured.** Performance is scored on code inspection, not
@@ -90,7 +89,7 @@ All four are **MANUAL ACTION REQUIRED** and detailed in
 | # | Blocker | Severity |
 | --- | --- | --- |
 | ~~1~~ | ~~Migration 0005 unapplied~~ — **RESOLVED 2026-08-10** | ~~Critical~~ |
-| 2 | No CI pipeline | **High** |
+| ~~2~~ | ~~No CI pipeline~~ — **RESOLVED** | ~~High~~ |
 | 3 | 16 specification documents missing | **Medium** |
 | 4 | No workspace invitation flow — role model enforced but unreachable | **Medium** |
 

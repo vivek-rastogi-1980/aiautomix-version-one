@@ -30,8 +30,10 @@ correctly predicated on all 15 tables, and every quality gate passes.
 Sprint 5.5 closed two Critical issues — an unpatched Next.js RCE with App Router
 middleware bypasses, and a lead-capture path that silently discarded submissions.
 
-What remains is operational rather than structural: no CI, three new findings
-from this review, and a body of documentation that does not exist.
+What remained was operational rather than structural. Two of those items are now
+closed — CI exists (`.github/workflows/ci.yml`) and the database findings are
+reconciled by migration 0006. What is left is unverified flows and a body of
+documentation that does not exist.
 
 ---
 
@@ -253,7 +255,7 @@ video makes LCP the likely weak point.
 
 | Item | Class | Deferral rationale |
 | --- | --- | --- |
-| TD-009 No CI | **HIGH** | **Requires CTO approval to defer.** Every gate above depends on a human remembering. |
+| ~~TD-009 No CI~~ | ~~HIGH~~ | **RESOLVED** — `.github/workflows/ci.yml`, five jobs, verified to need no secrets |
 | TD-010 SVG upload MIME trust | **HIGH** | Deferred — bounded to Supabase's own origin; fixing changes upload behaviour |
 | TD-015 No CSP | **HIGH** | Deferred — needs nonces on migrated inline blocks first |
 | TD-016 3 `npm audit` high | **HIGH** | Deferred — assessed unreachable; needs `next@16` major |
@@ -266,9 +268,8 @@ video makes LCP the likely weak point.
 | TD-013 320px 7px overflow | LOW | Fix attempted and reverted |
 | TD-014 Animation shorthand warnings | LOW | Re-render only |
 
-Four HIGH items remain. Per section 9, Sprint 6 may start only if each is fixed
-**or has explicit CTO-approved deferral.** Three carry documented technical
-rationale. **TD-009 (no CI) does not** — it is deferred only by omission.
+Three HIGH items remain, **all with documented technical rationale**. TD-009 —
+the one deferred only by omission — is now fixed.
 
 ---
 
@@ -285,11 +286,11 @@ rationale. **TD-009 (no CI) does not** — it is deferred only by omission.
 | Performance | 72 | No N+1, no hydration errors; CWV unmeasured |
 | Accessibility | 82 | Focus trap, labels, roles; contrast unmeasured |
 | Documentation | 70 | 8 review docs — **19 referenced specs do not exist** |
-| Deployment | 65 | Runbook + rollback written; **no CI**; Vercel/DNS unverified |
+| Deployment | 80 | Runbook + rollback written; **CI on every PR**; Vercel/DNS unverified |
 
-## **Overall: 83 / 100**
+## **Overall: 85 / 100**
 
-_Database 88 → 96 after migration 0006._
+_Database 88 → 96 (migration 0006); Deployment 65 → 80 (CI)._
 
 Weighted toward launch-blocking categories (Security, Database, API, Deployment).
 
@@ -297,7 +298,7 @@ Weighted toward launch-blocking categories (Security, Database, API, Deployment)
 
 ## Remaining risks
 
-1. **No CI** — every gate here depends on someone remembering. Highest leverage.
+1. ~~**No CI**~~ — resolved. Branch protection still needs enabling by hand.
 2. **Three core flows never verified** (section editing, version restore, logout).
 3. **Two AI flows never run against a real model** — only a mock provider.
 4. ~~**Schema drift**~~ — resolved by 0006; migration files reproduce production again.
@@ -313,8 +314,9 @@ found, no data-isolation issue, build passes.
 
 ### Conditions before Sprint 6 work merges
 
-1. **Add CI** running `typecheck`, `lint`, `test`, `build` — or record explicit
-   CTO approval to defer TD-009.
+1. ~~**Add CI**~~ — **DONE 2026-08-10.** `.github/workflows/ci.yml`. One manual
+   step remains: enable branch protection on `main` requiring the `CI` check.
+   That is a GitHub setting, not a file, and cannot be done from the repository.
 2. ~~**Write migration `0006`**~~ — **DONE 2026-08-10.** Created, applied in a
    transaction, and verified with 12 checks including idempotency. 0004
    untouched.

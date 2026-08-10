@@ -244,7 +244,7 @@ with `aria-invalid`; the modal has a focus trap with restore; the user menu has
 | ID | Severity | Issue |
 | --- | --- | --- |
 | OPS-1 | P0 | No `vercel.json`. Acceptable — Next defaults work — but no explicit region or function config. |
-| OPS-2 | P1 | No CI. Nothing runs `tsc`, `lint`, `build` or the smoke tests on push, so the clean state is unenforced. |
+| ~~OPS-2~~ | ~~P1~~ | **RESOLVED 2026-08-10** — `.github/workflows/ci.yml` runs typecheck, lint, format, tests, build and a dependency audit on every PR. |
 | OPS-3 | P1 | `NEXT_PUBLIC_SITE_URL` must be set on Vercel or canonicals/OG/auth emails fall back to the hardcoded default |
 | OPS-4 | P2 | No staging/production Supabase separation enforced in config |
 

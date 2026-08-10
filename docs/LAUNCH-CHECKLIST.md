@@ -133,6 +133,6 @@ These are documented decisions, not oversights. Detail in
 | SVG upload trusts client MIME | Phishing vector, sandboxed to Supabase's origin | P1 |
 | `next/font` not used | Render-blocking font request delays LCP | P1 |
 | 13 MB of MP4 from the origin | Slow on mobile connections | P1 |
-| No CI | Clean state is unenforced | P1 |
+| ~~No CI~~ | **RESOLVED** — `.github/workflows/ci.yml` runs on every PR | Done |
 | No tests for API/actions/RLS | Regressions in auth would be silent | P2 |
 | `next/image` unused | Largest remaining perf win; high risk to pixel fidelity | P2 |

@@ -1,0 +1,146 @@
+name: CI
+
+# Closes TD-009, the top item in docs/PRE-SPRINT-6-GO-NO-GO.md.
+#
+# Before this, every quality gate depended on a developer remembering to run it.
+# The Sprint 5.5 review found the consequence: `npm run lint` had been silently
+# covering less than half the codebase, and `npm audit` had never been run at
+# all — which is how an unpatched critical Next.js RCE reached production.
+#
+# The four jobs run in parallel so a pull request reports every failure at once
+# rather than stopping at the first. `ci` at the foot aggregates them into one
+# check, which is what branch protection should require.
+#
+# No secrets are needed. Verified by removing .env.local and running the full
+# suite and a production build: 126/126 checks pass and the build compiles.
+# Dashboard routes are `force-dynamic`, so nothing that needs Supabase is
+# prerendered, and `getSiteUrl()` falls back to the production domain.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A newer push makes an in-flight run obsolete. Cancel it rather than pay for
+# both. `push` on main is excluded from cancellation, so main's history keeps a
+# complete record.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only. Nothing here publishes, comments or writes.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # `eslint . --max-warnings 0` — the whole repository, not the five
+      # directories `next lint` used to cover.
+      - run: npm run lint
+      # Formatting is a gate too; a mixed-format diff hides real changes.
+      - run: npm run format:check
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # 126 checks: AI engine against a mock provider, report and plan document
+      # models, PDF output, and the security/authorization suite.
+      - run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Fails on `critical` only, deliberately.
+      #
+      # Three `high` findings are currently accepted with written rationale
+      # (docs/SECURITY-REPORT.md SEC-008): postcss and sharp, both unreachable in
+      # this application, both requiring a breaking next@16 upgrade. Gating on
+      # `high` would fail every run and train people to ignore the job — the
+      # failure mode this pipeline exists to prevent.
+      #
+      # `critical` still catches what matters: the Next.js RCE that reached
+      # production unnoticed would have failed this step.
+      - run: npm audit --audit-level=critical
+
+  ci:
+    name: CI
+    # The single check to require in branch protection. It cannot pass unless
+    # all five above did, so adding a job later does not mean remembering to
+    # update the protection rule.
+    needs: [typecheck, lint, test, build, audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify every job succeeded
+        run: |
+          echo "typecheck : ${{ needs.typecheck.result }}"
+          echo "lint      : ${{ needs.lint.result }}"
+          echo "test      : ${{ needs.test.result }}"
+          echo "build     : ${{ needs.build.result }}"
+          echo "audit     : ${{ needs.audit.result }}"
+          # `if: always()` means this job runs even when a dependency fails, so
+          # it has to check the results explicitly. Without this it would report
+          # success on a red pipeline.
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] \
+            || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All checks passed."
