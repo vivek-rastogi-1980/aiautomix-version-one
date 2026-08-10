@@ -216,6 +216,15 @@ Each checked and found sound.
 
 ---
 
+## Release-gate addendum (2026-08-10)
+
+Workspace isolation was verified against production with a real authenticated
+session, not only by reading policies: a disposable account was created, its
+workspace bootstrapped on first read with role `owner`, section edits and version
+restores were written and confirmed at the database, and after logout every
+`sb-*` cookie was gone and protected routes redirected. All test data and the
+account were removed afterwards; `auth.users` returned to its prior count.
+
 ## Remaining actions
 
 | Priority | Action | Owner |

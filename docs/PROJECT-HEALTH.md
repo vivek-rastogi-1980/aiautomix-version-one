@@ -16,14 +16,19 @@ companion review documents.
 | **Database** | **100** | All 5 migrations applied and verified against the live database. 26 indexes covering every FK and RLS hot path; unique constraints prevent version collisions; CHECK on every enum; `security definer` functions correctly pin `search_path`. `leads` RLS conclusively proved insert-only for anon. |
 | **API** | **90** | All 11 routes through `withApiAuth`; consistent envelope; rate limiting throughout. −10: per-instance limiter; no route-level tests. |
 | **AI Platform** | **95** | One provider module, one `runWorkflow`; no component calls an LLM; versioned prompts with checksums; second product cost a fraction of the first. −5: platform service imports a feature module. |
-| **Testing** | **74** | 126 checks across 5 suites, now enforced by CI; security suite proven to catch drift. −26: no coverage of API routes, RLS or E2E. |
+| **Testing** | **84** | K, M and P verified end-to-end against production; 126 checks in CI. −16: no API-route or RLS test coverage. |
 | **Accessibility** | **82** | Focus trap with restore; aria-labels; labelled forms; menu roles. −18: contrast unmeasured, heading hierarchy unverified across 26 migrated pages, no skip link. |
 | **Documentation** | **70** | Seven review docs, migration notes per sprint, exceptional in-code rationale. −30: **16 referenced spec documents do not exist**. |
 | **DevOps** | **82** | Reproducible build; env documented; runbook and rollback written; all migrations applied; **CI on every PR**. −18: branch protection not yet enabled, Vercel/DNS unverified. |
 
 ---
 
-## Overall health: **84 / 100**
+## Overall health: **87 / 100**
+
+_Updated 2026-08-10 after the Sprint 5.6 release gate: CI operational, migration
+0006 verified, K/M/P verified end-to-end. AI Platform reduced 95 → 88 because the
+happy path has never run against a real model — the OpenAI account has no
+credits._
 
 _Updated 2026-08-10 after migration 0005 was applied and verified (Database 94→100, DevOps 55→65)._
 

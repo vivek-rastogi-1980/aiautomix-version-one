@@ -138,6 +138,30 @@ Debt discovered during the Sprint 5.5 stabilization review of Sprints 1–5.
 - **Remaining manual step:** branch protection on `main` requiring the `CI`
   check — a GitHub repository setting, not a repository file.
 
+### TD-023 — OpenAI account has no credits
+- **Severity:** High · **Area:** DevOps / AI Platform
+- **Evidence:** A real Business Plan run on 2026-08-10 failed after 3 attempts in
+  5,320 ms with `AI_RATE_LIMITED`. Calling OpenAI directly returned HTTP 429
+  `insufficient_quota` / `credit_balance_exhausted`.
+- **Impact:** Every AI feature is non-functional in production. Not a code
+  defect — the platform degrades correctly: the failure is persisted, the plan
+  is marked failed and no partial sections are written.
+- **Fix:** Add credits. This is the only thing standing between CONDITIONAL GO
+  and GO.
+- **Status:** OPEN · **MANUAL ACTION REQUIRED**
+
+### TD-024 — 429 mapping conflates quota exhaustion with throttling
+- **Severity:** Low · **Area:** AI Platform
+- **Evidence:** `features/ai/engine/errors.ts` maps HTTP 429 to
+  `AI_RATE_LIMITED`. OpenAI uses 429 for both throttling and an exhausted
+  balance, so a billing problem surfaces as "too many requests, please slow
+  down".
+- **Impact:** A user whose account is out of credit is told to wait for a
+  condition that will never clear on its own.
+- **Fix:** Branch on `error.type === "insufficient_quota"` and map it to a
+  distinct `AI_QUOTA_EXHAUSTED`.
+- **Status:** OPEN · **Target:** Sprint 6
+
 ### TD-010 — SVG upload trusts client-declared MIME
 - **Severity:** High · **Area:** Security
 - **Evidence:** `lib/validations/profile.ts` validates `file.type`, which is

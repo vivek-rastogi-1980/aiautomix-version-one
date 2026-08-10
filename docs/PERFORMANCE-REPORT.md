@@ -108,6 +108,17 @@ and a stable network; local numbers mislead. Recorded as PERF-009.
 - **Recommendation:** Split the shorthand into longhand properties.
 - **Status:** OPEN
 
+## PERF-011 — Real AI latency (partial measurement)
+- **Severity:** — · **Metric:** AI round-trip
+- **Current:** The only real provider call made (2026-08-10) failed at
+  **5,320 ms across 3 attempts** with `credit_balance_exhausted`. That measures
+  the retry-and-fail path, not a successful generation, so no useful latency
+  figure exists for a completed workflow yet.
+- **Recommendation:** Once credits are added, record duration and token counts
+  from `ai_requests` for one validator and one plan run. The Workflow Manager
+  already persists both.
+- **Status:** OPEN
+
 ## PERF-009 — Core Web Vitals unmeasured
 - **Severity:** High (as a gap, not a defect) · **Metric:** LCP / INP / CLS
 - **Current:** **Not measured.** Requires a deployed URL.

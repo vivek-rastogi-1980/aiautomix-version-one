@@ -100,7 +100,11 @@ Workflow Manager already records duration, so the data to decide exists.
 is per-instance and loosens under serverless; PDF rendering is synchronous and
 CPU-bound; `home-view.tsx` is 6,301 lines shipped as one client component.
 
-**10. What must be fixed before Sprint 6?** See blockers below.
+**10. What must be fixed before Sprint 6?** As of the Sprint 5.6 release gate,
+one thing: the OpenAI account has no credits, so no AI workflow has ever
+completed against a real model. The failure path is verified sound (3 retries,
+typed error, persisted, no partial writes). See
+`docs/SPRINT-05.6-RELEASE-GATE.md`.
 
 ---
 
