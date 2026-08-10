@@ -1,0 +1,25 @@
+# Normalise line endings across platforms.
+#
+# Without this, a Windows checkout with `core.autocrlf=true` writes CRLF into the
+# working tree while git stores LF in the index. The committed content is fine
+# and `git diff` shows nothing, but Prettier defaults to `endOfLine: "lf"`, so
+# `npm run format:check` fails on every file — 107 of them — for a problem that
+# does not exist in the repository. That makes a real quality gate unusable on
+# Windows and trains people to ignore it.
+#
+# `eol=lf` forces LF in the working tree on every platform, which is what
+# Prettier, ESLint and the build all expect.
+* text=auto eol=lf
+
+# Binary assets must never be EOL-converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp4 binary
+*.webm binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
