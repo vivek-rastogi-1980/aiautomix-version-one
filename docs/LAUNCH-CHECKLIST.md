@@ -10,13 +10,16 @@ here — I have no access to those consoles and make no claim about their state.
 
 ## Blocking — the site is broken or leaking without these
 
-### 1. Apply migration 0005 to production Supabase
+### 1. ~~Apply migration 0005~~ — **DONE (verified 2026-08-10)**
 
-**MANUAL ACTION REQUIRED**
+All five migrations are applied. `leads` exists with RLS enabled, exactly one
+INSERT-only policy for `{anon, authenticated}`, three indexes, the `updated_at`
+trigger and the status CHECK constraint. Verified end-to-end: a lead submitted
+through `/api/leads` persisted with full UTM attribution, and the anon key could
+neither read, update nor delete the table.
 
-Lead capture writes to a `leads` table that does not exist yet. Until this runs,
-**every form submission returns a 500 and the lead is lost** — gracefully, with a
-fallback email shown to the visitor, but lost.
+If you provision a **new** Supabase project, run all five migrations below in
+order.
 
 Run in the Supabase SQL Editor, in order, if not already applied:
 

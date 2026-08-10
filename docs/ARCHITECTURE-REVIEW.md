@@ -209,7 +209,7 @@ current document sizes; a scaling constraint later.
 
 | # | Blocker | Severity | Owner |
 | --- | --- | --- | --- |
-| 1 | **Migration 0005 unapplied** — every lead submission 500s and is lost | Critical | MANUAL |
+| ~~1~~ | ~~Migration 0005 unapplied~~ — **RESOLVED.** Applied and verified 2026-08-10: 18 structural checks plus a conclusive RLS proof (anon may INSERT; cannot SELECT, UPDATE or DELETE), and one lead submitted end-to-end through `/api/leads` with full UTM attribution. | ~~Critical~~ | Done |
 | 2 | **No CI** — nothing enforces the gates this review established | High | Engineering |
 | 3 | **16 spec documents missing** — Sprint 6 cannot be reviewed against a spec that does not exist | Medium | Product |
 | 4 | **No invitation flow** — the role model is enforced but unreachable; any Sprint 6 collaboration work starts here | Medium | Product |

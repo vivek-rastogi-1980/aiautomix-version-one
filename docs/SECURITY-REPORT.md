@@ -66,7 +66,7 @@ third-party consoles. I have no access to them and make no claim about them.
 - **Verification:** Tested against the running endpoint — 422 invalid email with
   field errors · 422 unknown source · 400 malformed JSON · 413 oversized body ·
   201 honeypot with no signal · 429 at exactly the 6th request.
-- **Status:** **RESOLVED** — but see SEC-009: migration 0005 is unapplied.
+- **Status:** **RESOLVED** — and verified end-to-end against the live database on 2026-08-10 (see SEC-009).
 
 ---
 
@@ -183,11 +183,16 @@ third-party consoles. I have no access to them and make no claim about them.
 
 - **Severity:** Medium (availability, not confidentiality)
 - **Location:** `supabase/migrations/0005_leads.sql`
-- **Finding:** The migration has not been applied to any database.
+- **Finding:** ~~The migration has not been applied to any database.~~ **Applied and verified 2026-08-10.**
 - **Risk:** Every lead submission returns 500 and is lost. Failure is graceful —
   a user-safe message with a fallback email — but the data is gone.
-- **Remediation:** Apply migration 0005. First item on the launch checklist.
-- **Status:** **OPEN** — MANUAL ACTION REQUIRED
+- **Remediation:** Applied. Verified with 18 structural checks and a conclusive
+  RLS proof: with a row known to exist, the anon key returned `[]` on both a full
+  and a targeted read, and could neither UPDATE nor DELETE. PostgREST answers
+  those two with HTTP 204 — a success-shaped response that changes nothing,
+  because zero rows match the RLS-filtered set. An end-to-end submission through
+  `/api/leads` persisted every field including UTM attribution.
+- **Status:** **RESOLVED**
 
 ---
 
@@ -215,7 +220,7 @@ Each checked and found sound.
 
 | Priority | Action | Owner |
 | --- | --- | --- |
-| 1 | Apply migration 0005 (SEC-009) | **MANUAL** |
+| ~~1~~ | ~~Apply migration 0005 (SEC-009)~~ — **done 2026-08-10** | Complete |
 | 2 | Add CI so these gates are enforced (TD-009) | Engineering |
 | 3 | Harden SVG upload (SEC-006) | Sprint 6 |
 | 4 | Nonce inline blocks, then land CSP (SEC-007) | Sprint 6 |

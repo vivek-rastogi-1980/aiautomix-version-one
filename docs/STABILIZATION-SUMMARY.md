@@ -104,7 +104,7 @@ offending assertion named. Reverted and re-verified green.
 | Open | Severity | Note |
 | --- | --- | --- |
 | SVG upload trusts client MIME | High | Bounded — Supabase Storage serves from its own origin |
-| Migration 0005 unapplied | Medium | Availability, not confidentiality |
+| ~~Migration 0005 unapplied~~ | ~~Medium~~ | **RESOLVED 2026-08-10** — applied and verified end-to-end |
 
 **Accepted with rationale:** no CSP (needs nonces for migrated inline blocks
 first); 3 dependency advisories requiring `next@16` — postcss is build-time only
@@ -155,7 +155,7 @@ migration 0004 and fails if TypeScript role predicates drift from the SQL.
 
 | Priority | Item | Target |
 | --- | --- | --- |
-| 1 | Apply migration 0005 — **MANUAL** | Before launch |
+| ~~1~~ | ~~Apply migration 0005~~ — **DONE 2026-08-10**, verified end-to-end | Complete |
 | 2 | Add CI (typecheck/lint/test/build) | Sprint 6 |
 | 3 | Measure Core Web Vitals — **MANUAL** | After deploy |
 | 4 | Harden SVG upload | Sprint 6 |
@@ -169,9 +169,11 @@ migration 0004 and fails if TypeScript role predicates drift from the SQL.
 
 ## Sprint 6 blockers
 
-1. **Migration 0005 unapplied** — Critical. Lead capture is code-complete but
-   non-functional.
-2. **No CI** — High. Nothing enforces the gates this review established.
+1. ~~**Migration 0005 unapplied**~~ — **RESOLVED 2026-08-10.** Applied and
+   verified: 18 structural checks, a conclusive RLS proof, and one lead
+   submitted end-to-end through `/api/leads` with full attribution.
+2. **No CI** — High. Nothing enforces the gates this review established. **This
+   is now the top blocker.**
 3. **16 spec documents missing** — Medium. Sprint 6 cannot be reviewed against a
    spec that does not exist.
 4. **No invitation flow** — Medium. The role model is enforced in RLS but
@@ -181,8 +183,8 @@ migration 0004 and fails if TypeScript role predicates drift from the SQL.
 
 ## Recommended next actions
 
-1. Apply migration 0005 and submit one real lead end-to-end. This is the only
-   path that could not be verified from the repository.
+1. ~~Apply migration 0005~~ — **done and verified 2026-08-10.** Lead capture is
+   live: anon can insert, cannot read back, and attribution persists correctly.
 2. Add a GitHub Actions workflow — it makes every other finding here durable.
 3. Deploy, then run PageSpeed Insights and fill in PERF-009.
 4. Decide whether Sprint 6 is collaboration (needs invitations) or AI Business

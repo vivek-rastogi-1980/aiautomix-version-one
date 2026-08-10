@@ -78,7 +78,8 @@ Debt discovered during the Sprint 5.5 stabilization review of Sprints 1–5.
   lead was lost. No storage, no attribution, no spam protection.
 - **Fix:** `POST /api/leads` → `leads` table (migration 0005), with Zod
   validation, honeypot, per-IP rate limiting, body-size cap and UTM capture.
-- **Status:** RESOLVED · **Sprint:** 5.5
+- **Status:** RESOLVED · **Sprint:** 5.5 · Migration applied and verified
+  end-to-end against the live database 2026-08-10.
 
 ### TD-007 — `metadataBase` hardcoded to staging
 - **Severity:** High · **Area:** SEO

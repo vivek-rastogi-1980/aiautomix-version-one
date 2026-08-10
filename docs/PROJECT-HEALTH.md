@@ -13,35 +13,38 @@ companion review documents.
 | **Code Quality** | **88** | Strict TS, ESLint 0/0 **repo-wide** (was covering <half). −12: migrated views carry blanket disables; oversized components. |
 | **Security** | **85** | Critical Next RCE + middleware bypasses patched; 0 Critical open; RLS sound; 6 headers live. −15: no CSP, SVG MIME trust, 3 accepted advisories. |
 | **Performance** | **72** | No N+1; 103 kB shared JS; 0 hydration warnings. −28: 13 MB origin video, render-blocking fonts, no `next/image`, **CWV unmeasured**. |
-| **Database** | **94** | 26 indexes covering every FK and RLS hot path; unique constraints prevent version collisions; CHECK on every enum; `security definer` functions correctly pin `search_path`. −6: migration 0005 unapplied. |
+| **Database** | **100** | All 5 migrations applied and verified against the live database. 26 indexes covering every FK and RLS hot path; unique constraints prevent version collisions; CHECK on every enum; `security definer` functions correctly pin `search_path`. `leads` RLS conclusively proved insert-only for anon. |
 | **API** | **90** | All 11 routes through `withApiAuth`; consistent envelope; rate limiting throughout. −10: per-instance limiter; no route-level tests. |
 | **AI Platform** | **95** | One provider module, one `runWorkflow`; no component calls an LLM; versioned prompts with checksums; second product cost a fraction of the first. −5: platform service imports a feature module. |
 | **Testing** | **68** | 126 checks across 5 suites; new security suite proven to catch drift. −32: no coverage of API routes, RLS, or E2E; no CI. |
 | **Accessibility** | **82** | Focus trap with restore; aria-labels; labelled forms; menu roles. −18: contrast unmeasured, heading hierarchy unverified across 26 migrated pages, no skip link. |
 | **Documentation** | **70** | Seven review docs, migration notes per sprint, exceptional in-code rationale. −30: **16 referenced spec documents do not exist**. |
-| **DevOps** | **55** | Reproducible build; env documented; runbook and rollback written. −45: **no CI**, migration 0005 unapplied, Vercel/DNS unverified. |
+| **DevOps** | **65** | Reproducible build; env documented; runbook and rollback written; all migrations applied. −35: **no CI**, Vercel/DNS unverified. |
 
 ---
 
-## Overall health: **81 / 100**
+## Overall health: **84 / 100**
+
+_Updated 2026-08-10 after migration 0005 was applied and verified (Database 94→100, DevOps 55→65)._
 
 Weighted toward the categories that block a launch (Security, Database, API,
 DevOps) rather than a flat mean.
 
 **The shape of this number:** the *code* is in good condition — architecture 92,
-AI platform 95, database 94. What drags the score is *operational*: no CI (55),
-an unapplied migration, and unmeasured Core Web Vitals. Those are hours of work,
-not weeks, and none require touching application code.
+AI platform 95, database 100. What drags the score is *operational*: no CI (65)
+and unmeasured Core Web Vitals. Those are hours of work, not weeks, and neither
+requires touching application code.
 
 ---
 
 ## Production readiness: **CONDITIONAL**
 
-Ready once four things happen. Nothing on this list requires code changes.
+Ready once the remaining three happen. Nothing on this list requires code
+changes; the first condition is now met.
 
 | # | Condition | Why it blocks |
 | --- | --- | --- |
-| 1 | **Apply migration 0005** | Every lead submission returns 500 and is lost. The most valuable page on the site has no working conversion path. |
+| ~~1~~ | ~~Apply migration 0005~~ | **RESOLVED 2026-08-10.** Verified end-to-end: a lead submitted through `/api/leads` persisted with full attribution, and RLS was conclusively proved (anon insert-only). |
 | 2 | **Set `NEXT_PUBLIC_SITE_URL`** on Vercel | Canonicals, sitemap, robots, OG images and **auth email links** all derive from it. Wrong value breaks password reset. |
 | 3 | **Attach both hosts** to the Vercel project | The apex→www 308 only fires if the apex reaches this deployment. |
 | 4 | **Add the two Supabase Auth redirect URLs** | Email confirmation and password reset break without them. |
@@ -55,8 +58,8 @@ All four are **MANUAL ACTION REQUIRED** and detailed in
 
 1. **No CI.** Every gate this review established — typecheck, lint, 126 tests,
    build — depends on a human remembering. The single highest-leverage fix.
-2. **Unapplied migration.** Fails gracefully, but leads are lost silently from
-   the business's perspective.
+2. ~~**Unapplied migration.**~~ **Resolved 2026-08-10** — applied and verified
+   end-to-end against the live database.
 3. **Core Web Vitals unmeasured.** Performance is scored on code inspection, not
    observation. The 13 MB of origin video suggests LCP will be the weak point.
 4. **No API or RLS test coverage.** `withApiAuth` is now the single auth
@@ -86,7 +89,7 @@ All four are **MANUAL ACTION REQUIRED** and detailed in
 
 | # | Blocker | Severity |
 | --- | --- | --- |
-| 1 | Migration 0005 unapplied | **Critical** |
+| ~~1~~ | ~~Migration 0005 unapplied~~ — **RESOLVED 2026-08-10** | ~~Critical~~ |
 | 2 | No CI pipeline | **High** |
 | 3 | 16 specification documents missing | **Medium** |
 | 4 | No workspace invitation flow — role model enforced but unreachable | **Medium** |

@@ -168,8 +168,10 @@ Each is checkable from a browser.
 - [ ] Paste the URL into LinkedIn — 1200×630 card renders
 - [ ] Vercel function logs show no unexpected errors
 
-The lead submission is the one path that **could not be verified pre-launch**,
-because migration 0005 has not been applied anywhere. Test it first.
+Lead submission **was** verified against the live database on 2026-08-10 — a row
+persisted through `/api/leads` with full attribution, and RLS was proved to block
+anon reads. Re-test after deploy anyway: the production environment variables and
+domain differ from the local run.
 
 ---
 
@@ -199,4 +201,4 @@ applied, environment changes, and rollback notes if any.
 
 | Date | Commit | Changes | Migrations | Notes |
 | --- | --- | --- | --- | --- |
-| _pending_ | _pending_ | Sprint 06 — production hardening, SEO foundation, lead capture, Next security patch | **0005 required** | First production deploy |
+| _pending_ | _pending_ | Sprint 06 — production hardening, SEO foundation, lead capture, Next security patch | 0001–0005 **applied & verified 2026-08-10** | First production deploy |
