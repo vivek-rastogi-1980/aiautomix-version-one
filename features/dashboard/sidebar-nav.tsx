@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   Building2,
+  CreditCard,
+  Stethoscope,
   FileText,
   FolderKanban,
   LayoutDashboard,
@@ -31,6 +33,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/ai/history", label: "AI activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/workspace", label: "Workspace", icon: Building2 },
+  { href: "/usage", label: "Usage & plan", icon: CreditCard },
+  { href: "/diagnostics", label: "Diagnostics", icon: Stethoscope },
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -21,6 +21,8 @@ import type { AiRunStatus } from "@/types/database";
 export interface WorkflowRunRecord {
   userId: string;
   projectId?: string | null;
+  /** Sprint 6.5: commercial boundary for usage metering. */
+  workspaceId?: string | null;
   workflow: string;
   promptVersion: string;
   provider: string;
@@ -98,6 +100,7 @@ export async function recordWorkflowRun(
         : Promise.resolve(),
       supabase.from("ai_usage_logs").insert({
         user_id: record.userId,
+        workspace_id: record.workspaceId ?? null,
         project_id: record.projectId ?? null,
         request_id: request.id,
         workflow: record.workflow,

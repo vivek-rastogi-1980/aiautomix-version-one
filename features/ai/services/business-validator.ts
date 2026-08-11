@@ -63,6 +63,7 @@ export async function validateBusinessIdea(
       await runWorkflow<BusinessValidatorReport>({
         workflowId: BUSINESS_VALIDATOR_WORKFLOW,
         userId,
+        workspaceId,
         projectId,
         input,
       });

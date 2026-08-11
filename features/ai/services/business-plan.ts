@@ -84,6 +84,7 @@ export async function generateBusinessPlan({
       await runWorkflow<BusinessPlanDocument>({
         workflowId: BUSINESS_PLAN_WORKFLOW,
         userId,
+        workspaceId,
         projectId,
         input,
       });
