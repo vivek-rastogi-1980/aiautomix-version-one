@@ -29,6 +29,9 @@ export type Profile = {
   website: string | null;
   avatar_url: string | null;
   logo_url: string | null;
+  /** Migration 0008. Non-null means suspended; restoring sets it back to null. */
+  suspended_at: string | null;
+  suspended_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -184,6 +187,9 @@ export type Workspace = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Migration 0008. Suspension is reversible; deletion is avoided entirely. */
+  suspended_at: string | null;
+  suspended_reason: string | null;
 };
 
 export type WorkspaceMember = {
@@ -587,6 +593,41 @@ type BusinessPlanVersionInsert = {
  * the `Relationships` key that `@supabase/supabase-js` requires to recognise it
  * as a queryable table (otherwise inference falls back to `never`).
  */
+
+// ---------------------------------------------------------------------------
+// Admin platform (migration 0008)
+// ---------------------------------------------------------------------------
+
+/** Membership of `admin_users` is the ONLY thing that confers admin access. */
+export type AdminUserRow = {
+  user_id: string;
+  role: string;
+  is_active: boolean;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminRolePermissionRow = {
+  role: string;
+  permission: string;
+};
+
+export type AdminAuditLogRow = {
+  id: string;
+  actor_user_id: string;
+  actor_role: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  before_data: unknown;
+  after_data: unknown;
+  reason: string | null;
+  request_id: string | null;
+  created_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -723,6 +764,31 @@ export interface Database {
         Update: Partial<CreditTransactionRow>;
         Relationships: [];
       };
+      admin_users: {
+        Row: AdminUserRow;
+        Insert: Omit<AdminUserRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<AdminUserRow>;
+        Relationships: [];
+      };
+      admin_role_permissions: {
+        Row: AdminRolePermissionRow;
+        Insert: AdminRolePermissionRow;
+        Update: Partial<AdminRolePermissionRow>;
+        Relationships: [];
+      };
+      admin_audit_logs: {
+        Row: AdminAuditLogRow;
+        Insert: Omit<AdminAuditLogRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        // No client write path exists; declared for type completeness only.
+        Update: Partial<AdminAuditLogRow>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -739,6 +805,76 @@ export interface Database {
           p_idempotency_key?: string | null;
         };
         Returns: number;
+      };
+
+      // --- Migration 0008: admin platform -------------------------------
+      // Each of these re-checks authority inside the database, so being able
+      // to call one is not the same as being allowed to act.
+      admin_role: { Args: Record<string, never>; Returns: string | null };
+      is_admin: { Args: Record<string, never>; Returns: boolean };
+      admin_has: { Args: { p_permission: string }; Returns: boolean };
+      admin_log: {
+        Args: {
+          p_action: string;
+          p_entity_type: string;
+          p_entity_id?: string | null;
+          p_before?: unknown;
+          p_after?: unknown;
+          p_reason?: string | null;
+          p_request_id?: string | null;
+        };
+        Returns: string;
+      };
+      admin_set_user_suspended: {
+        Args: {
+          p_user_id: string;
+          p_suspended: boolean;
+          p_reason?: string | null;
+        };
+        Returns: undefined;
+      };
+      admin_set_workspace_suspended: {
+        Args: {
+          p_workspace_id: string;
+          p_suspended: boolean;
+          p_reason?: string | null;
+        };
+        Returns: undefined;
+      };
+      admin_apply_credits: {
+        Args: {
+          p_workspace_id: string;
+          p_kind: string;
+          p_amount: number;
+          p_reason: string;
+        };
+        Returns: number;
+      };
+      admin_update_plan: {
+        Args: {
+          p_plan_id: string;
+          p_name: string | null;
+          p_description: string | null;
+          p_price_monthly: number | null;
+          p_monthly_credits: number;
+          p_is_public: boolean;
+          p_reason: string;
+        };
+        Returns: undefined;
+      };
+      admin_update_entitlement: {
+        Args: {
+          p_plan_id: string;
+          p_feature: string;
+          p_enabled: boolean;
+          p_limit: number | null;
+          p_reason: string;
+        };
+        Returns: undefined;
+      };
+      admin_platform_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
       };
     };
     Enums: Record<never, never>;
