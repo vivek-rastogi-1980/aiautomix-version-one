@@ -84,9 +84,16 @@ export async function getAdminContext(): Promise<AdminContext | null> {
  * Guard for any admin surface: returns the context or redirects.
  *
  * A signed-out visitor goes to `/login`; a signed-in non-admin goes to
- * `/dashboard`. Neither learns that `/admin` exists as a distinct thing — the
- * response is a redirect either way, so the admin surface is not enumerable by
- * comparing status codes.
+ * `/dashboard`. Neither sees any admin content: the redirect body is 26 bytes
+ * and contains none of the panel's vocabulary (verified over HTTP).
+ *
+ * What this does NOT hide is the existence of the namespace. `/admin` answers
+ * 307 where an unrouted path answers 404, so anyone can tell `/admin/*` is a
+ * real protected area — and a signed-in non-admin can tell it apart from other
+ * protected routes by which destination they are sent to. That is accepted
+ * rather than fixed: the security property that matters is that no data crosses
+ * the boundary, and obscuring the URL would buy nothing against an attacker who
+ * can guess the word "admin" while making the redirect harder to reason about.
  */
 export async function requireAdmin(): Promise<AdminContext> {
   const user = await getUser();

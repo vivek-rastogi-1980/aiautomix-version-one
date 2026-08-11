@@ -196,6 +196,17 @@ whatever screenshot follows.
 - No occurrence of `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY` or
   `SUPABASE_DB_URL` anywhere in `.next/static/`.
 
+### Accepted, not fixed: the namespace is discoverable
+
+`/admin` answers `307` where an unrouted path answers `404`, so anyone can
+determine that `/admin/*` is a real protected area. An earlier code comment
+claimed the surface was "not enumerable by comparing status codes"; that was an
+overstatement and has been corrected in `features/admin/guard.ts`.
+
+This is accepted rather than fixed. The property that matters is that no data
+crosses the boundary — the redirect body carries none — and obscuring the URL
+buys nothing against an attacker who can guess the word "admin".
+
 ---
 
 ## 6. Test coverage against `ADMIN-TEST-CASES.md`
@@ -206,7 +217,7 @@ whatever screenshot follows.
 ### Authentication
 | Case | Coverage |
 |---|---|
-| Unauthenticated cannot access `/admin` | AUTO (middleware prefix) + layout `requireAdmin()` redirect. **GAP:** no end-to-end HTTP test. |
+| Unauthenticated cannot access `/admin` | **HTTP** — verified live against the dev server: all 5 routes tested return `307` to `/login?redirectTo=…`, body 26 bytes with no admin vocabulary |
 | Authenticated non-admin cannot access | DB — role resolves null, every read returns 0 rows |
 | Admin session enforced server-side | AUTO — `guard.ts` is `server-only`; role read via RPC from `auth.uid()` |
 
@@ -257,10 +268,16 @@ suites all unchanged and still passing.
 
 ## 7. Known limitations
 
-1. **No end-to-end HTTP test of the redirects.** Denial is proven at the
-   database layer, which is the layer that matters, but nothing asserts that
-   `GET /admin` as an anonymous client returns a redirect. Worth a Playwright
-   pass.
+1. **End-to-end HTTP testing is half done.** The *anonymous* case is now
+   verified live: every admin route returns `307` to `/login` with the correct
+   `redirectTo`, a 26-byte body, and no admin vocabulary. The *signed-in
+   non-admin* case is still only proven at the database layer, because
+   exercising it requires an authenticated session. Worth a Playwright pass with
+   a seeded non-admin account.
+
+   Note also that these checks were run by hand against a dev server; they are
+   not part of `npm test`, which is deliberately server-free so CI stays fast.
+   A Playwright suite would make them permanent.
 2. **List rendering is not fixture-tested.** Pagination maths and search
    escaping are covered; "does the users table show the right rows" is verified
    by inspection only. Needs seeded fixtures.
