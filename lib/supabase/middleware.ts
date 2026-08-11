@@ -17,6 +17,12 @@ const PROTECTED_PREFIXES = [
   "/ai",
   "/plans",
   "/workspace",
+  "/usage",
+  "/diagnostics",
+  // The admin area. The layout re-checks the admin role server-side and RLS
+  // refuses the data regardless — this only spares an unauthenticated visitor
+  // a pointless render.
+  "/admin",
 ];
 
 /** Auth routes an already-signed-in user should be bounced away from. */

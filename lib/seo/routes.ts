@@ -117,6 +117,7 @@ export const PRIVATE_PREFIXES: string[] = [
   "/workspace",
   "/usage",
   "/diagnostics",
+  "/admin",
   "/profile",
   "/settings",
   "/ai/history",

@@ -15,7 +15,8 @@
     "test:pdf": "tsx --tsconfig scripts/tsconfig.json scripts/pdf-smoke.tsx",
     "test:security": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/security-smoke.tsx",
     "test:commerce": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/commerce-smoke.tsx",
-    "test": "npm run test:engine && npm run test:report && npm run test:plan && npm run test:pdf && npm run test:security && npm run test:commerce",
+    "test:admin": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/admin-smoke.tsx",
+    "test": "npm run test:engine && npm run test:report && npm run test:plan && npm run test:pdf && npm run test:security && npm run test:commerce && npm run test:admin",
     "typecheck": "tsc --noEmit",
     "sync:workflows": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/sync-workflows.ts"
   },
