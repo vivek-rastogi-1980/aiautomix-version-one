@@ -122,6 +122,7 @@ export async function runWorkflow<TOutput>(
       const requestId = await recordWorkflowRun({
         userId: run.userId,
         projectId: run.projectId ?? null,
+        workspaceId: run.workspaceId ?? null,
         workflow: metadata.workflow,
         promptVersion: metadata.promptVersion,
         provider: metadata.provider,
@@ -149,6 +150,7 @@ export async function runWorkflow<TOutput>(
   await recordWorkflowRun({
     userId: run.userId,
     projectId: run.projectId ?? null,
+    workspaceId: run.workspaceId ?? null,
     workflow: workflow.id,
     promptVersion: workflow.promptVersion,
     provider: provider.id,

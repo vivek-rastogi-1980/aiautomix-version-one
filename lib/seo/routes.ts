@@ -93,6 +93,7 @@ export const PUBLIC_ROUTES: PublicRoute[] = [
   { path: "/travel-ai-automation", priority: 0.7, changeFrequency: "monthly" },
 
   // Supporting
+  { path: "/pricing", priority: 0.9, changeFrequency: "monthly" },
   { path: "/news", priority: 0.6, changeFrequency: "weekly" },
   { path: "/contact", priority: 0.6, changeFrequency: "yearly" },
   { path: "/privacy-policy", priority: 0.3, changeFrequency: "yearly" },
@@ -114,6 +115,8 @@ export const PRIVATE_PREFIXES: string[] = [
   "/reports",
   "/validator",
   "/workspace",
+  "/usage",
+  "/diagnostics",
   "/profile",
   "/settings",
   "/ai/history",

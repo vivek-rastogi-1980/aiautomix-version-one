@@ -102,6 +102,15 @@ export interface WorkflowRunInput {
   input: unknown;
   /** Optional project the run belongs to (USAGE-TRACKING-SPEC.md). */
   projectId?: string | null;
+  /**
+   * Sprint 6.5: the commercial boundary this run is metered against.
+   *
+   * Optional so existing callers keep compiling, but a run without it produces
+   * a usage row with a null `workspace_id` — invisible to the workspace usage
+   * dashboard and to any future billing period. Every caller inside the app
+   * supplies it.
+   */
+  workspaceId?: string | null;
 }
 
 /** Provenance persisted alongside every result (JSON-SCHEMAS.md). */

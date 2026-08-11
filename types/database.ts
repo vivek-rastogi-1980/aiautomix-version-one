@@ -123,6 +123,8 @@ export type AiResponseRecord = {
 export type AiUsageLog = {
   id: string;
   user_id: string;
+  /** Sprint 6.5: the commercial boundary this usage belongs to. */
+  workspace_id: string | null;
   project_id: string | null;
   request_id: string | null;
   workflow: string;
@@ -315,6 +317,7 @@ type AiResponseInsert = {
 
 type AiUsageLogInsert = {
   user_id: string;
+  workspace_id?: string | null;
   workflow: string;
   provider: string;
   model: string;
@@ -487,6 +490,85 @@ type LeadInsertRow = {
   updated_at?: string;
 };
 
+// --- Sprint 6.5: Commercial platform (migration 0007) ------------------------
+
+export type PlanRow = {
+  id: string;
+  name: string;
+  description: string;
+  price_monthly: number | null;
+  price_yearly: number | null;
+  currency: string;
+  monthly_credits: number;
+  sort_order: number;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlanEntitlementRow = {
+  id: string;
+  plan_id: string;
+  feature: string;
+  is_enabled: boolean;
+  limit_value: number | null;
+  created_at: string;
+};
+
+export type SubscriptionRow = {
+  id: string;
+  workspace_id: string;
+  plan_id: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  trial_ends_at: string | null;
+  provider: string | null;
+  provider_ref: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreditAccountRow = {
+  id: string;
+  workspace_id: string;
+  balance: number;
+  lifetime_granted: number;
+  lifetime_spent: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreditTransactionRow = {
+  id: string;
+  workspace_id: string;
+  account_id: string;
+  kind: string;
+  amount: number;
+  balance_after: number;
+  reason: string | null;
+  workflow: string | null;
+  ai_request_id: string | null;
+  created_by: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+};
+
+type SubscriptionInsert = {
+  workspace_id: string;
+  plan_id: string;
+  status?: string;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean;
+  canceled_at?: string | null;
+  trial_ends_at?: string | null;
+  provider?: string | null;
+  provider_ref?: string | null;
+  id?: string;
+};
+
 type BusinessPlanVersionInsert = {
   section_id: string;
   plan_id: string;
@@ -598,9 +680,67 @@ export interface Database {
         Update: Partial<Lead>;
         Relationships: [];
       };
+      plans: {
+        Row: PlanRow;
+        Insert: Partial<PlanRow> & {
+          id: string;
+          name: string;
+          description: string;
+        };
+        Update: Partial<PlanRow>;
+        Relationships: [];
+      };
+      plan_entitlements: {
+        Row: PlanEntitlementRow;
+        Insert: Partial<PlanEntitlementRow> & {
+          plan_id: string;
+          feature: string;
+        };
+        Update: Partial<PlanEntitlementRow>;
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: SubscriptionRow;
+        Insert: SubscriptionInsert;
+        Update: Partial<SubscriptionRow>;
+        Relationships: [];
+      };
+      credit_accounts: {
+        Row: CreditAccountRow;
+        Insert: Partial<CreditAccountRow> & { workspace_id: string };
+        Update: Partial<CreditAccountRow>;
+        Relationships: [];
+      };
+      credit_transactions: {
+        Row: CreditTransactionRow;
+        Insert: Partial<CreditTransactionRow> & {
+          workspace_id: string;
+          account_id: string;
+          kind: string;
+          amount: number;
+          balance_after: number;
+        };
+        Update: Partial<CreditTransactionRow>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      /** Migration 0007 — the only supported way to change a credit balance. */
+      apply_credit_transaction: {
+        Args: {
+          p_workspace_id: string;
+          p_kind: string;
+          p_amount: number;
+          p_reason?: string | null;
+          p_workflow?: string | null;
+          p_ai_request_id?: string | null;
+          p_created_by?: string | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: number;
+      };
+    };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
   };
