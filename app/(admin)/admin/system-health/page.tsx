@@ -94,7 +94,7 @@ export default async function AdminSystemHealthPage() {
               No workflows registered, or the registry could not be read.
             </p>
           ) : (
-            <ul className="mt-4 divide-y divide-white/[0.06]">
+            <ul className="mt-4 divide-y divide-line">
               {catalog.map((entry) => (
                 <li
                   key={entry.slug}
@@ -127,7 +127,7 @@ export default async function AdminSystemHealthPage() {
               No AI failures recorded recently.
             </p>
           ) : (
-            <ul className="mt-4 divide-y divide-white/[0.06]">
+            <ul className="mt-4 divide-y divide-line">
               {failures.map((event) => (
                 <li key={event.id} className="py-3">
                   <p className="text-sm font-medium text-foreground">

@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getProfile } from "@/features/profile/data";
 import { initialsFrom } from "@/lib/format";
 import { DashboardShell } from "@/features/dashboard/dashboard-shell";
+import { getTheme } from "@/lib/theme";
 
 // Dashboard routes are per-user and read the session cookie, so they must be
 // rendered on demand — never statically prerendered at build time.
@@ -19,13 +20,14 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
-  const profile = await getProfile(user.id);
+  const [profile, theme] = await Promise.all([getProfile(user.id), getTheme()]);
 
   const email = user.email ?? "";
   const name = profile?.full_name?.trim() || email.split("@")[0] || "Account";
 
   return (
     <DashboardShell
+      theme={theme}
       user={{
         name,
         email,

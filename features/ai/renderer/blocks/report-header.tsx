@@ -64,7 +64,7 @@ export function ReportHeader({
         ) : null}
       </div>
 
-      <div className="mt-7 border-t border-white/[0.06] pt-6">
+      <div className="mt-7 border-t border-line pt-6">
         <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
           Executive summary
         </h2>

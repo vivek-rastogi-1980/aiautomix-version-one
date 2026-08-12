@@ -315,3 +315,56 @@ suites all unchanged and still passing.
 6. **Only then, payment processing.** The data model has been ready since
    Sprint 6.5, and adding a provider to a model that already enforces limits and
    audits changes is a far smaller change than doing both at once.
+
+---
+
+## 9. Addendum — light theme for the signed-in surfaces
+
+Added after the sprint: an opt-in light theme for the dashboard and admin
+panel. Marketing pages remain dark and are structurally unable to change.
+
+### How it is scoped
+
+`:root` holds the original dark values; light is an override under
+`[data-theme="light"]`, and that attribute is set only on the two signed-in
+shells. The 24 migrated marketing pages paint themselves with inline hex and
+never render those shells, so no preference can reach them. Verified against
+the build output: `news.html` still contains `#0A0B0F` and no `data-theme`.
+
+### Two things that would have broken
+
+**Hardcoded alpha utilities.** 44 uses of `border-white/[0.06]` and similar.
+White at 6% over a white background is invisible — every border, divider and
+hover state in light mode would have silently vanished. They are now a
+`--line-*` / `--fill-*` scale that inverts to a dark alpha, keeping the same
+visual weight against the opposite background. 50 files migrated.
+
+**Opacity modifiers.** The sticky headers use `bg-ink/75` and `bg-surface/60`.
+A colour token holding a plain hex in a CSS variable cannot take Tailwind's
+`/opacity` modifier, so those would have compiled away. Solid colours are
+therefore stored as RGB channel triplets and mapped with `<alpha-value>`;
+confirmed in the built CSS as `rgb(var(--ink-rgb)/.75)`.
+
+### Preference storage
+
+A cookie, read server-side in each shell's layout. `localStorage` would only be
+readable after hydration, so the page would paint dark and snap to light — the
+flash that makes theme toggles feel broken. Not stored per account either: the
+same person wants different answers on a bright monitor at work and in a dark
+room at home.
+
+### Contrast
+
+A WCAG audit of both palettes surfaced a **pre-existing** failure:
+`muted-strong` measured 3.84:1 in the dark theme, against the 4.5:1 that small
+print requires. It was corrected in both themes (dark now 4.56:1, light
+4.53:1). Every text pair in both palettes now passes AA.
+
+Brand cyan was not usable as a link colour on white — about 1.9:1 — so links
+route through an `--accent` token that darkens to `#0A63B0` in light mode
+(6.13:1 on card).
+
+### Not verified
+
+The rendered result. Both themes are proven at the token, build and contrast
+level, but nobody has looked at the light dashboard — it sits behind a login.

@@ -77,7 +77,7 @@ export function ImageUploader({
         ) : (
           <span
             className={cn(
-              "flex size-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]",
+              "flex size-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-fill-1",
             )}
           >
             {currentUrl ? (

@@ -29,7 +29,7 @@ export function MetricBars({ entries }: MetricBarsProps) {
             </dd>
           </div>
           <div
-            className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
+            className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-fill-3"
             role="img"
             aria-label={`${entry.label}: ${entry.value} out of 100`}
           >

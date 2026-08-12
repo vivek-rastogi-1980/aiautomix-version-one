@@ -52,7 +52,7 @@ export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
+        className="flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors hover:bg-fill-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
       >
         <Avatar
           src={avatarUrl}
@@ -73,9 +73,9 @@ export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-2xl border border-white/[0.08] bg-surface p-1.5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
         >
-          <div className="border-b border-white/[0.06] px-3 py-2.5 sm:hidden">
+          <div className="border-b border-line px-3 py-2.5 sm:hidden">
             <p className="text-sm font-medium text-foreground">{name}</p>
             <p className="truncate text-xs text-muted">{email}</p>
           </div>
@@ -83,7 +83,7 @@ export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
             href="/profile"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-fill-2 hover:text-foreground"
           >
             <UserRound className="size-4" />
             Profile
@@ -92,7 +92,7 @@ export function UserMenu({ name, email, avatarUrl, initials }: UserMenuProps) {
             href="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition-colors hover:bg-fill-2 hover:text-foreground"
           >
             <Settings className="size-4" />
             Settings

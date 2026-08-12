@@ -39,7 +39,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
           href={project.website}
           target="_blank"
           rel="noreferrer noopener"
-          className="mt-1 inline-flex items-center gap-1.5 text-sm text-brand-cyan hover:underline"
+          className="mt-1 inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
         >
           <ExternalLink className="size-3.5" />
           <span className="truncate">
@@ -48,7 +48,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         </a>
       ) : null}
 
-      <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-4">
+      <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
         <span className="text-xs text-muted-strong">
           {formatDate(project.created_at)}
         </span>
@@ -57,7 +57,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             type="button"
             onClick={() => onEdit(project)}
             aria-label={`Edit ${project.name}`}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-foreground"
+            className="inline-flex size-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-fill-3 hover:text-foreground"
           >
             <Pencil className="size-4" />
           </button>

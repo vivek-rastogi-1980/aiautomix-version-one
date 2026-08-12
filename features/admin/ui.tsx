@@ -84,7 +84,7 @@ export function Stat({
 /** Table wrapper that scrolls itself rather than the page. */
 export function TableShell({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
+    <div className="overflow-x-auto rounded-xl border border-line">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         {children}
       </table>
@@ -103,7 +103,7 @@ export function Th({
     <th
       scope="col"
       className={cn(
-        "border-b border-white/[0.06] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted",
+        "border-b border-line px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted",
         className,
       )}
     >
@@ -122,7 +122,7 @@ export function Td({
   return (
     <td
       className={cn(
-        "border-b border-white/[0.04] px-4 py-3 text-foreground",
+        "border-b border-line px-4 py-3 text-foreground",
         className,
       )}
     >
@@ -152,7 +152,7 @@ export function NoPermission({ permission }: { permission: string }) {
     <Card className="p-6">
       <p className="text-sm text-muted">
         Your role does not include{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-foreground">
+        <code className="rounded bg-fill-3 px-1.5 py-0.5 text-xs text-foreground">
           {permission}
         </code>
         , so this section is hidden.
@@ -195,7 +195,7 @@ export function Pagination<T>({
         {page.page > 1 ? (
           <Link
             href={build(page.page - 1)}
-            className="rounded-full border border-white/[0.12] px-3.5 py-1.5 text-sm text-foreground hover:bg-white/[0.06]"
+            className="rounded-full border border-line-strong px-3.5 py-1.5 text-sm text-foreground hover:bg-fill-3"
           >
             Previous
           </Link>
@@ -203,7 +203,7 @@ export function Pagination<T>({
         {page.page < page.pageCount ? (
           <Link
             href={build(page.page + 1)}
-            className="rounded-full border border-white/[0.12] px-3.5 py-1.5 text-sm text-foreground hover:bg-white/[0.06]"
+            className="rounded-full border border-line-strong px-3.5 py-1.5 text-sm text-foreground hover:bg-fill-3"
           >
             Next
           </Link>
@@ -236,7 +236,7 @@ export function FilterBar({
       {children}
       <button
         type="submit"
-        className="rounded-full bg-white/[0.08] px-4 py-2 text-sm font-medium text-foreground hover:bg-white/[0.12]"
+        className="rounded-full bg-fill-4 px-4 py-2 text-sm font-medium text-foreground hover:bg-fill-5"
       >
         Apply
       </button>
@@ -262,7 +262,7 @@ export function Field({
 }
 
 const CONTROL =
-  "h-10 rounded-lg border border-white/[0.12] bg-white/[0.03] px-3 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none";
+  "h-10 rounded-lg border border-line-strong bg-fill-1 px-3 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none";
 
 export function TextFilter({
   name,

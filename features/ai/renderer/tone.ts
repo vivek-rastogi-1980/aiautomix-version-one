@@ -10,7 +10,7 @@ import type { ReportLevel, ReportTone } from "@/features/ai/renderer/types";
 
 export const TONE_TEXT: Record<ReportTone, string> = {
   positive: "text-brand-green",
-  caution: "text-brand-cyan",
+  caution: "text-accent",
   negative: "text-danger-soft",
   neutral: "text-muted",
 };
@@ -33,7 +33,7 @@ export const TONE_SURFACE: Record<ReportTone, string> = {
   positive: "border-brand-green/25 bg-brand-green/[0.06]",
   caution: "border-brand-cyan/25 bg-brand-cyan/[0.06]",
   negative: "border-danger/25 bg-danger/[0.06]",
-  neutral: "border-white/10 bg-white/[0.03]",
+  neutral: "border-white/10 bg-fill-1",
 };
 
 /** Badge variants from `components/ui/badge`. */

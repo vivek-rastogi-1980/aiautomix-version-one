@@ -121,10 +121,7 @@ export default async function AdminAuditLogsPage({
                   (after && Object.keys(after).length > 0);
 
                 return (
-                  <tr
-                    key={entry.id}
-                    className="align-top hover:bg-white/[0.02]"
-                  >
+                  <tr key={entry.id} className="align-top hover:bg-fill-1">
                     <Td className="whitespace-nowrap text-muted">
                       {formatDateTime(entry.created_at)}
                     </Td>
@@ -146,10 +143,10 @@ export default async function AdminAuditLogsPage({
                     <Td>
                       {hasChange ? (
                         <details>
-                          <summary className="cursor-pointer text-sm text-brand-cyan">
+                          <summary className="cursor-pointer text-sm text-accent">
                             View
                           </summary>
-                          <pre className="mt-2 max-h-56 max-w-md overflow-auto whitespace-pre-wrap break-words rounded-lg border border-white/[0.08] bg-white/[0.02] p-2 text-xs">
+                          <pre className="mt-2 max-h-56 max-w-md overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-fill-1 p-2 text-xs">
                             {JSON.stringify({ before, after }, null, 2)}
                           </pre>
                         </details>

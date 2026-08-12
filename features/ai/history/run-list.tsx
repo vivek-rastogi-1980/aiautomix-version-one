@@ -85,7 +85,7 @@ export function RunList({ runs }: RunListProps) {
               {run.reportId ? (
                 <Link
                   href={`/reports/${run.reportId}`}
-                  className="text-sm font-medium text-brand-cyan hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
+                  className="text-sm font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
                 >
                   Open report
                   <span className="sr-only">

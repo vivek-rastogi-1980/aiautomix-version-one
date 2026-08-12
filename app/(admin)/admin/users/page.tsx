@@ -88,7 +88,7 @@ export default async function AdminUsersPage({
             </thead>
             <tbody>
               {result.rows.map((user) => (
-                <tr key={user.id} className="hover:bg-white/[0.02]">
+                <tr key={user.id} className="hover:bg-fill-1">
                   <Td>
                     <span className="font-medium">
                       {user.full_name?.trim() || "—"}
@@ -106,7 +106,7 @@ export default async function AdminUsersPage({
                   <Td className="text-right">
                     <Link
                       href={`/admin/users/${user.id}`}
-                      className="text-sm text-brand-cyan hover:underline"
+                      className="text-sm text-accent hover:underline"
                     >
                       Open
                     </Link>

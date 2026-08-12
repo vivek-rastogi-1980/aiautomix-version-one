@@ -130,7 +130,7 @@ export default async function UsagePage() {
         </div>
         <Link
           href="/pricing"
-          className="shrink-0 text-sm font-medium text-brand-cyan hover:underline"
+          className="shrink-0 text-sm font-medium text-accent hover:underline"
         >
           Compare plans →
         </Link>
@@ -168,7 +168,7 @@ export default async function UsagePage() {
         <p className="text-sm text-muted">
           What your current plan includes each month.
         </p>
-        <ul className="mt-5 divide-y divide-white/[0.06]">
+        <ul className="mt-5 divide-y divide-line">
           {Object.entries(FEATURE_LABELS).map(([key, label]) => {
             const entry = entitlements[key];
             const denied = !entry || !entry.enabled || entry.limit === 0;
@@ -182,7 +182,7 @@ export default async function UsagePage() {
                   {denied ? (
                     <span className="text-muted-strong">Not included</span>
                   ) : entry.limit === null ? (
-                    <span className="text-brand-cyan">Unlimited</span>
+                    <span className="text-accent">Unlimited</span>
                   ) : (
                     <span className="text-foreground">{entry.limit}</span>
                   )}
@@ -201,13 +201,13 @@ export default async function UsagePage() {
         {events.length === 0 ? (
           <p className="mt-4 text-sm text-muted">
             No AI runs yet this workspace. Start with the{" "}
-            <Link href="/validator" className="text-brand-cyan hover:underline">
+            <Link href="/validator" className="text-accent hover:underline">
               idea validator
             </Link>
             .
           </p>
         ) : (
-          <ul className="mt-5 divide-y divide-white/[0.06]">
+          <ul className="mt-5 divide-y divide-line">
             {events.map((event) => (
               <li
                 key={event.id}
@@ -249,7 +249,7 @@ export default async function UsagePage() {
         {history.length === 0 ? (
           <p className="mt-4 text-sm text-muted">No credit activity yet.</p>
         ) : (
-          <ul className="mt-5 divide-y divide-white/[0.06]">
+          <ul className="mt-5 divide-y divide-line">
             {history.map((tx) => (
               <li
                 key={tx.id}
@@ -267,7 +267,7 @@ export default async function UsagePage() {
                 <div className="shrink-0 text-right">
                   <p
                     className={`text-sm font-semibold ${
-                      tx.amount > 0 ? "text-brand-cyan" : "text-foreground"
+                      tx.amount > 0 ? "text-accent" : "text-foreground"
                     }`}
                   >
                     {tx.amount > 0 ? "+" : ""}

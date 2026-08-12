@@ -99,7 +99,7 @@ export default async function DiagnosticsPage() {
         <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
           Registered workflows
         </h2>
-        <ul className="mt-5 divide-y divide-white/[0.06]">
+        <ul className="mt-5 divide-y divide-line">
           {catalog.map((entry) => (
             <li
               key={entry.slug}
@@ -129,7 +129,7 @@ export default async function DiagnosticsPage() {
         {failures.length === 0 ? (
           <p className="mt-4 text-sm text-muted">No failures recorded.</p>
         ) : (
-          <ul className="mt-5 divide-y divide-white/[0.06]">
+          <ul className="mt-5 divide-y divide-line">
             {failures.map((event) => (
               <li
                 key={event.id}

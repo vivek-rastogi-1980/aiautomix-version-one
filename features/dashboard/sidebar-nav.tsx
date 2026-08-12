@@ -61,7 +61,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
               "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
               active
                 ? "bg-brand-violet/15 text-foreground"
-                : "text-muted hover:bg-white/[0.04] hover:text-foreground",
+                : "text-muted hover:bg-fill-2 hover:text-foreground",
             )}
           >
             <Icon
