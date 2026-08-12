@@ -7,7 +7,7 @@ interface TimelineProps {
 /** Timeline — sequential steps with timeframes (REPORT-DESIGN-SYSTEM.md). */
 export function Timeline({ entries }: TimelineProps) {
   return (
-    <ol className="relative flex flex-col gap-6 border-l border-white/[0.08] pl-6">
+    <ol className="relative flex flex-col gap-6 border-l border-line pl-6">
       {entries.map((entry, index) => (
         <li key={`${entry.title}-${index}`} className="relative">
           <span
@@ -18,7 +18,7 @@ export function Timeline({ entries }: TimelineProps) {
             <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
               {entry.title}
             </h3>
-            <span className="text-xs font-medium uppercase tracking-wide text-brand-cyan">
+            <span className="text-xs font-medium uppercase tracking-wide text-accent">
               {entry.timeframe}
             </span>
           </div>

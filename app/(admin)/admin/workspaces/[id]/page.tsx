@@ -139,7 +139,7 @@ export default async function AdminWorkspaceDetail({
             {members.length === 0 ? (
               <p className="mt-4 text-sm text-muted">No members.</p>
             ) : (
-              <ul className="mt-4 divide-y divide-white/[0.06]">
+              <ul className="mt-4 divide-y divide-line">
                 {members.map((member) => (
                   <li
                     key={member.id}
@@ -149,7 +149,7 @@ export default async function AdminWorkspaceDetail({
                       {context.has("users.read") ? (
                         <Link
                           href={`/admin/users/${member.user_id}`}
-                          className="truncate text-sm font-medium text-brand-cyan hover:underline"
+                          className="truncate text-sm font-medium text-accent hover:underline"
                         >
                           {member.profile?.full_name?.trim() || "Unnamed user"}
                         </Link>
@@ -187,7 +187,7 @@ export default async function AdminWorkspaceDetail({
             ) : !ledger || ledger.rows.length === 0 ? (
               <p className="mt-4 text-sm text-muted">No credit activity.</p>
             ) : (
-              <ul className="mt-4 divide-y divide-white/[0.06]">
+              <ul className="mt-4 divide-y divide-line">
                 {ledger.rows.map((tx) => (
                   <li
                     key={tx.id}
@@ -205,7 +205,7 @@ export default async function AdminWorkspaceDetail({
                     <div className="shrink-0 text-right">
                       <p
                         className={`text-sm font-semibold ${
-                          tx.amount > 0 ? "text-brand-cyan" : "text-foreground"
+                          tx.amount > 0 ? "text-accent" : "text-foreground"
                         }`}
                       >
                         {tx.amount > 0 ? "+" : ""}
@@ -229,7 +229,7 @@ export default async function AdminWorkspaceDetail({
               {history.rows.length === 0 ? (
                 <p className="mt-4 text-sm text-muted">Nothing recorded.</p>
               ) : (
-                <ul className="mt-4 divide-y divide-white/[0.06]">
+                <ul className="mt-4 divide-y divide-line">
                   {history.rows.map((entry) => (
                     <li key={entry.id} className="py-3">
                       <p className="text-sm font-medium text-foreground">

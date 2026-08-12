@@ -28,7 +28,7 @@ const QUADRANTS = [
     key: "opportunities",
     label: "Opportunities",
     icon: TrendingUp,
-    accent: "text-brand-cyan",
+    accent: "text-accent",
     dot: "bg-brand-cyan",
     surface: "border-brand-cyan/25 bg-brand-cyan/[0.06]",
   },

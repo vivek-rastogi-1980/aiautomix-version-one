@@ -20,12 +20,12 @@ const buttonVariants = cva(
           "bg-brand-gradient text-ink shadow-[0_10px_30px_-10px_rgba(124,92,255,0.6)] hover:brightness-110 hover:shadow-[0_14px_38px_-10px_rgba(124,92,255,0.75)]",
         lime: "bg-accent-lime text-accent-dark hover:brightness-105",
         secondary:
-          "bg-surface text-foreground border border-white/10 hover:border-white/20 hover:bg-white/[0.04]",
+          "bg-surface text-foreground border border-white/10 hover:border-white/20 hover:bg-fill-2",
         outline:
           "border border-brand-violet/60 text-foreground hover:bg-brand-violet/10",
-        ghost: "text-foreground hover:bg-white/[0.06]",
+        ghost: "text-foreground hover:bg-fill-3",
         danger: "bg-danger text-ink hover:bg-danger-soft",
-        link: "text-brand-cyan underline-offset-4 hover:underline rounded-none px-0",
+        link: "text-accent underline-offset-4 hover:underline rounded-none px-0",
       },
       size: {
         sm: "h-9 px-4 text-sm",

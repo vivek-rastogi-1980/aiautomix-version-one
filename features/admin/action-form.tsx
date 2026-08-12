@@ -102,7 +102,7 @@ export function ActionForm({
             "self-start rounded-full border px-4 py-2 text-sm font-medium transition-colors",
             destructive
               ? "border-red-500/40 text-red-300 hover:bg-red-500/10"
-              : "border-white/[0.14] text-foreground hover:bg-white/[0.06]",
+              : "border-line-strong text-foreground hover:bg-fill-3",
           )}
         >
           {label}
@@ -112,7 +112,7 @@ export function ActionForm({
             role="status"
             className={cn(
               "text-sm",
-              result.ok ? "text-brand-cyan" : "text-red-300",
+              result.ok ? "text-accent" : "text-red-300",
             )}
           >
             {result.message}
@@ -128,7 +128,7 @@ export function ActionForm({
         "rounded-xl border p-4",
         destructive
           ? "border-red-500/30 bg-red-500/[0.04]"
-          : "border-white/[0.12]",
+          : "border-line-strong",
       )}
     >
       <p className="text-sm font-semibold text-foreground">{confirmTitle}</p>
@@ -145,7 +145,7 @@ export function ActionForm({
             value={amountValue}
             onChange={(e) => setAmountValue(e.target.value)}
             placeholder={amount.placeholder}
-            className="h-10 w-48 rounded-lg border border-white/[0.12] bg-white/[0.03] px-3 text-sm text-foreground focus:border-brand-violet focus:outline-none"
+            className="h-10 w-48 rounded-lg border border-line-strong bg-fill-1 px-3 text-sm text-foreground focus:border-brand-violet focus:outline-none"
           />
         </label>
       ) : null}
@@ -160,7 +160,7 @@ export function ActionForm({
           rows={2}
           maxLength={500}
           placeholder={reasonPlaceholder}
-          className="rounded-lg border border-white/[0.12] bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none"
+          className="rounded-lg border border-line-strong bg-fill-1 px-3 py-2 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none"
         />
         <span className="text-xs text-muted-strong">
           Recorded permanently in the audit log. It cannot be edited later.
@@ -176,7 +176,7 @@ export function ActionForm({
             "rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
             destructive
               ? "bg-red-500/90 text-white hover:bg-red-500"
-              : "bg-white/[0.12] text-foreground hover:bg-white/[0.18]",
+              : "bg-fill-5 text-foreground hover:bg-fill-6",
           )}
         >
           {pending ? "Working…" : confirmLabel}

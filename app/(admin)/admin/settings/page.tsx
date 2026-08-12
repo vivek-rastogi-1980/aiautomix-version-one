@@ -65,7 +65,7 @@ export default async function AdminSettingsPage() {
             {context.permissions.map((permission) => (
               <code
                 key={permission}
-                className="rounded bg-white/[0.06] px-2 py-1 text-xs text-foreground"
+                className="rounded bg-fill-3 px-2 py-1 text-xs text-foreground"
               >
                 {permission}
               </code>
@@ -87,7 +87,7 @@ export default async function AdminSettingsPage() {
                 <tr>
                   <th
                     scope="col"
-                    className="border-b border-white/[0.06] px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted"
+                    className="border-b border-line px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted"
                   >
                     Permission
                   </th>
@@ -95,7 +95,7 @@ export default async function AdminSettingsPage() {
                     <th
                       key={role}
                       scope="col"
-                      className="border-b border-white/[0.06] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted"
+                      className="border-b border-line px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted"
                     >
                       {ROLE_LABELS[role as AdminRole]}
                     </th>
@@ -107,7 +107,7 @@ export default async function AdminSettingsPage() {
                   <tr key={permission}>
                     <th
                       scope="row"
-                      className="border-b border-white/[0.04] px-3 py-2 text-left font-mono text-xs font-normal text-foreground"
+                      className="border-b border-line px-3 py-2 text-left font-mono text-xs font-normal text-foreground"
                     >
                       {permission}
                     </th>
@@ -119,13 +119,10 @@ export default async function AdminSettingsPage() {
                       return (
                         <td
                           key={role}
-                          className="border-b border-white/[0.04] px-3 py-2 text-center"
+                          className="border-b border-line px-3 py-2 text-center"
                         >
                           {held ? (
-                            <span
-                              className="text-brand-cyan"
-                              aria-label="granted"
-                            >
+                            <span className="text-accent" aria-label="granted">
                               ✓
                             </span>
                           ) : (
@@ -153,7 +150,7 @@ export default async function AdminSettingsPage() {
           {!staff || staff.length === 0 ? (
             <p className="mt-4 text-sm text-muted">No admin accounts found.</p>
           ) : (
-            <ul className="mt-4 divide-y divide-white/[0.06]">
+            <ul className="mt-4 divide-y divide-line">
               {staff.map((member) => (
                 <li
                   key={member.user_id}
@@ -188,7 +185,7 @@ export default async function AdminSettingsPage() {
             </ul>
           )}
 
-          <div className="mt-5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
+          <div className="mt-5 rounded-lg border border-line bg-fill-1 p-4">
             <p className="text-sm text-muted">
               Admin roles cannot be granted from this panel. `admin_users` has
               no write policy, so promotion requires direct database access —

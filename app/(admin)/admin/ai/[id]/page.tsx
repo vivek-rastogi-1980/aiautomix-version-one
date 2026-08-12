@@ -51,7 +51,7 @@ export default async function AdminAiDetail({
         actions={
           <Link
             href="/admin/ai"
-            className="text-sm text-brand-cyan hover:underline"
+            className="text-sm text-accent hover:underline"
           >
             ← All requests
           </Link>
@@ -149,7 +149,7 @@ export default async function AdminAiDetail({
               </p>
               {errorPreview.text ? (
                 <>
-                  <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-xs text-foreground">
+                  <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-fill-1 p-3 text-xs text-foreground">
                     {errorPreview.text}
                   </pre>
                   {errorPreview.hadSecret ? (

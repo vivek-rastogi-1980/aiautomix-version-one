@@ -131,7 +131,7 @@ function Modal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-surface p-6 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)] focus:outline-none sm:p-7",
+          "relative z-10 w-full max-w-lg rounded-3xl border border-line bg-surface p-6 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)] focus:outline-none sm:p-7",
           className,
         )}
       >
@@ -139,7 +139,7 @@ function Modal({
           type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
+          className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-fill-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-violet"
         >
           <X className="size-5" />
         </button>

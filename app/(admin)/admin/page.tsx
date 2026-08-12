@@ -163,7 +163,7 @@ export default async function AdminDashboard() {
             </h2>
             <Link
               href="/admin/ai?status=failed"
-              className="text-sm text-brand-cyan hover:underline"
+              className="text-sm text-accent hover:underline"
             >
               View all →
             </Link>
@@ -171,12 +171,12 @@ export default async function AdminDashboard() {
           {failures.length === 0 ? (
             <EmptyState title="No failures recorded." />
           ) : (
-            <Card className="divide-y divide-white/[0.06] p-0">
+            <Card className="divide-y divide-line p-0">
               {failures.map((event) => (
                 <Link
                   key={event.id}
                   href={`/admin/ai/${event.id}`}
-                  className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-white/[0.03]"
+                  className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-fill-1"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
@@ -204,12 +204,12 @@ export default async function AdminDashboard() {
             {workspaces.length === 0 ? (
               <EmptyState title="No workspaces yet." />
             ) : (
-              <Card className="divide-y divide-white/[0.06] p-0">
+              <Card className="divide-y divide-line p-0">
                 {workspaces.map((workspace) => (
                   <Link
                     key={workspace.id}
                     href={`/admin/workspaces/${workspace.id}`}
-                    className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-white/[0.03]"
+                    className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-fill-1"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">
@@ -238,7 +238,7 @@ export default async function AdminDashboard() {
             {credits.length === 0 ? (
               <EmptyState title="No credit movements yet." />
             ) : (
-              <Card className="divide-y divide-white/[0.06] p-0">
+              <Card className="divide-y divide-line p-0">
                 {credits.map((tx) => (
                   <div
                     key={tx.id}
@@ -255,7 +255,7 @@ export default async function AdminDashboard() {
                     </div>
                     <p
                       className={`shrink-0 text-sm font-semibold ${
-                        tx.amount > 0 ? "text-brand-cyan" : "text-foreground"
+                        tx.amount > 0 ? "text-accent" : "text-foreground"
                       }`}
                     >
                       {tx.amount > 0 ? "+" : ""}
@@ -290,7 +290,7 @@ export default async function AdminDashboard() {
           </div>
           <Link
             href="/admin/system-health"
-            className="mt-3 inline-block text-sm text-brand-cyan hover:underline"
+            className="mt-3 inline-block text-sm text-accent hover:underline"
           >
             Full health detail →
           </Link>

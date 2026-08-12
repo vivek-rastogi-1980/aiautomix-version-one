@@ -24,7 +24,7 @@ export default async function VerifyEmailPage({
           Already confirmed?{" "}
           <Link
             href="/login"
-            className="font-medium text-brand-cyan hover:underline"
+            className="font-medium text-accent hover:underline"
           >
             Sign in
           </Link>

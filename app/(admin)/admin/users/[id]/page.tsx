@@ -120,7 +120,7 @@ export default async function AdminUserDetail({
                 This user belongs to no workspaces.
               </p>
             ) : (
-              <ul className="mt-4 divide-y divide-white/[0.06]">
+              <ul className="mt-4 divide-y divide-line">
                 {memberships.map((membership) => (
                   <li
                     key={membership.id}
@@ -130,7 +130,7 @@ export default async function AdminUserDetail({
                       {membership.workspace ? (
                         <Link
                           href={`/admin/workspaces/${membership.workspace.id}`}
-                          className="truncate text-sm font-medium text-brand-cyan hover:underline"
+                          className="truncate text-sm font-medium text-accent hover:underline"
                         >
                           {membership.workspace.name}
                         </Link>
@@ -162,7 +162,7 @@ export default async function AdminUserDetail({
               {history.rows.length === 0 ? (
                 <p className="mt-4 text-sm text-muted">Nothing recorded.</p>
               ) : (
-                <ul className="mt-4 divide-y divide-white/[0.06]">
+                <ul className="mt-4 divide-y divide-line">
                   {history.rows.map((entry) => (
                     <li key={entry.id} className="py-3">
                       <p className="text-sm font-medium text-foreground">

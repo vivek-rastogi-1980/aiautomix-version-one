@@ -19,7 +19,7 @@ export function RankedList({ entries, levelLabel }: RankedListProps) {
       {entries.map((entry, index) => (
         <li
           key={`${entry.title}-${index}`}
-          className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:p-5"
+          className="rounded-2xl border border-line bg-fill-1 p-4 sm:p-5"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
@@ -37,7 +37,7 @@ export function RankedList({ entries, levelLabel }: RankedListProps) {
             {entry.description}
           </p>
           {entry.footnote ? (
-            <p className="mt-3 border-t border-white/[0.06] pt-3 text-sm leading-relaxed text-muted">
+            <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-muted">
               <span className="font-medium text-foreground/90">
                 {entry.footnote.label}:
               </span>{" "}

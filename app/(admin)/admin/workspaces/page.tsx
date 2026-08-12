@@ -86,7 +86,7 @@ export default async function AdminWorkspacesPage({
             </thead>
             <tbody>
               {result.rows.map((workspace) => (
-                <tr key={workspace.id} className="hover:bg-white/[0.02]">
+                <tr key={workspace.id} className="hover:bg-fill-1">
                   <Td>
                     <span className="font-medium">{workspace.name}</span>
                   </Td>
@@ -109,7 +109,7 @@ export default async function AdminWorkspacesPage({
                   <Td className="text-right">
                     <Link
                       href={`/admin/workspaces/${workspace.id}`}
-                      className="text-sm text-brand-cyan hover:underline"
+                      className="text-sm text-accent hover:underline"
                     >
                       Open
                     </Link>

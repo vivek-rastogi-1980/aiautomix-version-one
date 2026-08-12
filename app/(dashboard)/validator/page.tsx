@@ -31,7 +31,7 @@ export default async function ValidatorPage() {
         </div>
         <Link
           href="/reports"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-cyan hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
         >
           <History className="size-4" /> Report history
         </Link>

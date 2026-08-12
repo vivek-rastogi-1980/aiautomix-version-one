@@ -65,7 +65,7 @@ export default async function AdminCreditsPage({
           href="/admin/credits"
           className={`rounded-full px-4 py-1.5 text-sm ${
             view === "accounts"
-              ? "bg-white/[0.12] font-medium text-foreground"
+              ? "bg-fill-5 font-medium text-foreground"
               : "text-muted hover:text-foreground"
           }`}
         >
@@ -75,7 +75,7 @@ export default async function AdminCreditsPage({
           href="/admin/credits?view=ledger"
           className={`rounded-full px-4 py-1.5 text-sm ${
             view === "ledger"
-              ? "bg-white/[0.12] font-medium text-foreground"
+              ? "bg-fill-5 font-medium text-foreground"
               : "text-muted hover:text-foreground"
           }`}
         >
@@ -100,7 +100,7 @@ export default async function AdminCreditsPage({
               </thead>
               <tbody>
                 {accounts.rows.map((account) => (
-                  <tr key={account.id} className="hover:bg-white/[0.02]">
+                  <tr key={account.id} className="hover:bg-fill-1">
                     <Td className="font-medium">
                       {account.workspace?.name ?? "—"}
                     </Td>
@@ -114,7 +114,7 @@ export default async function AdminCreditsPage({
                     <Td className="text-right">
                       <Link
                         href={`/admin/workspaces/${account.workspace_id}`}
-                        className="text-sm text-brand-cyan hover:underline"
+                        className="text-sm text-accent hover:underline"
                       >
                         Manage
                       </Link>
@@ -168,14 +168,14 @@ export default async function AdminCreditsPage({
                 </thead>
                 <tbody>
                   {ledger.rows.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-white/[0.02]">
+                    <tr key={tx.id} className="hover:bg-fill-1">
                       <Td className="whitespace-nowrap text-muted">
                         {formatDateTime(tx.created_at)}
                       </Td>
                       <Td className="font-medium">{tx.kind}</Td>
                       <Td
                         className={
-                          tx.amount > 0 ? "text-brand-cyan" : "text-foreground"
+                          tx.amount > 0 ? "text-accent" : "text-foreground"
                         }
                       >
                         {tx.amount > 0 ? "+" : ""}

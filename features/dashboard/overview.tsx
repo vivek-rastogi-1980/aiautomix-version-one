@@ -119,7 +119,7 @@ export function Overview({
           </div>
           <Link
             href="/projects"
-            className="inline-flex items-center gap-1 text-sm font-medium text-brand-cyan hover:underline"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
             View all <ArrowRight className="size-4" />
           </Link>
@@ -142,7 +142,7 @@ export function Overview({
             </Link>
           </div>
         ) : (
-          <ul className="mt-5 divide-y divide-white/[0.06]">
+          <ul className="mt-5 divide-y divide-line">
             {recent.map((project) => (
               <li
                 key={project.id}

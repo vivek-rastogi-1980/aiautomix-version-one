@@ -80,7 +80,7 @@ export default async function WorkspacePage() {
         </div>
 
         {canManage(role) ? (
-          <div className="border-t border-white/[0.06] pt-6">
+          <div className="border-t border-line pt-6">
             <RenameWorkspaceForm name={workspace.name} />
           </div>
         ) : null}
@@ -127,7 +127,7 @@ export default async function WorkspacePage() {
           <table className="w-full min-w-[24rem] text-left text-sm">
             <caption className="sr-only">Workspace members and roles</caption>
             <thead>
-              <tr className="border-b border-white/[0.08] text-xs uppercase tracking-wide text-muted-strong">
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-muted-strong">
                 <th scope="col" className="px-5 py-3 font-medium">
                   Member
                 </th>
@@ -143,7 +143,7 @@ export default async function WorkspacePage() {
               {members.map((member) => (
                 <tr
                   key={member.id}
-                  className="border-b border-white/[0.05] last:border-0"
+                  className="border-b border-line last:border-0"
                 >
                   <th
                     scope="row"

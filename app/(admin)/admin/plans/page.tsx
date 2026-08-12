@@ -52,7 +52,7 @@ export default async function AdminPlansPage() {
           </thead>
           <tbody>
             {plans.map((plan) => (
-              <tr key={plan.id} className="hover:bg-white/[0.02]">
+              <tr key={plan.id} className="hover:bg-fill-1">
                 <Td>
                   <span className="font-medium">{plan.name}</span>
                   <p className="mt-0.5 max-w-md text-xs text-muted">

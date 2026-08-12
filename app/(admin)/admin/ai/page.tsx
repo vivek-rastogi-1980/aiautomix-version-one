@@ -126,7 +126,7 @@ export default async function AdminAiPage({
             </thead>
             <tbody>
               {result.rows.map((event) => (
-                <tr key={event.id} className="hover:bg-white/[0.02]">
+                <tr key={event.id} className="hover:bg-fill-1">
                   <Td className="whitespace-nowrap text-muted">
                     {formatDateTime(event.created_at)}
                   </Td>
@@ -152,7 +152,7 @@ export default async function AdminAiPage({
                   <Td className="text-right">
                     <Link
                       href={`/admin/ai/${event.id}`}
-                      className="text-sm text-brand-cyan hover:underline"
+                      className="text-sm text-accent hover:underline"
                     >
                       Detail
                     </Link>

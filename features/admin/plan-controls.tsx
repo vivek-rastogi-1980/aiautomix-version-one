@@ -19,17 +19,14 @@ import type { ActionResult } from "@/features/admin/actions";
  */
 
 const INPUT =
-  "h-10 w-full rounded-lg border border-white/[0.12] bg-white/[0.03] px-3 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none";
+  "h-10 w-full rounded-lg border border-line-strong bg-fill-1 px-3 text-sm text-foreground placeholder:text-muted-strong focus:border-brand-violet focus:outline-none";
 
 function Result({ result }: { result: ActionResult | null }) {
   if (!result) return null;
   return (
     <p
       role="status"
-      className={cn(
-        "mt-2 text-sm",
-        result.ok ? "text-brand-cyan" : "text-red-300",
-      )}
+      className={cn("mt-2 text-sm", result.ok ? "text-accent" : "text-red-300")}
     >
       {result.message}
     </p>
@@ -67,7 +64,7 @@ export function PlanEditor({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-full border border-white/[0.14] px-3.5 py-1.5 text-sm text-foreground hover:bg-white/[0.06]"
+          className="rounded-full border border-line-strong px-3.5 py-1.5 text-sm text-foreground hover:bg-fill-3"
         >
           Edit
         </button>
@@ -89,7 +86,7 @@ export function PlanEditor({
     (priceMinor === null || (Number.isFinite(priceMinor) && priceMinor >= 0));
 
   return (
-    <div className="rounded-xl border border-white/[0.12] p-4">
+    <div className="rounded-xl border border-line-strong p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5">
           <span className="text-xs uppercase tracking-wider text-muted">
@@ -139,7 +136,7 @@ export function PlanEditor({
             type="checkbox"
             checked={isPublic}
             onChange={(e) => setIsPublic(e.target.checked)}
-            className="size-4 rounded border-white/20 bg-white/[0.03]"
+            className="size-4 rounded border-white/20 bg-fill-1"
           />
           <span className="text-sm text-foreground">
             Show on the pricing page
@@ -178,7 +175,7 @@ export function PlanEditor({
               if (res.ok) setOpen(false);
             })
           }
-          className="rounded-full bg-white/[0.12] px-4 py-2 text-sm font-medium text-foreground hover:bg-white/[0.18] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-fill-5 px-4 py-2 text-sm font-medium text-foreground hover:bg-fill-6 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving…" : "Save plan"}
         </button>
@@ -223,7 +220,7 @@ export function EntitlementEditor({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-sm text-brand-cyan hover:underline"
+          className="text-sm text-accent hover:underline"
         >
           Edit
         </button>
@@ -239,13 +236,13 @@ export function EntitlementEditor({
     (parsed === null || (Number.isFinite(parsed) && parsed >= 0));
 
   return (
-    <div className="rounded-lg border border-white/[0.12] p-3">
+    <div className="rounded-lg border border-line-strong p-3">
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={isEnabled}
           onChange={(e) => setIsEnabled(e.target.checked)}
-          className="size-4 rounded border-white/20 bg-white/[0.03]"
+          className="size-4 rounded border-white/20 bg-fill-1"
         />
         <span className="text-sm text-foreground">Enabled</span>
       </label>
@@ -291,7 +288,7 @@ export function EntitlementEditor({
               if (res.ok) setOpen(false);
             })
           }
-          className="rounded-full bg-white/[0.12] px-3.5 py-1.5 text-sm text-foreground hover:bg-white/[0.18] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-fill-5 px-3.5 py-1.5 text-sm text-foreground hover:bg-fill-6 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Saving…" : "Save"}
         </button>

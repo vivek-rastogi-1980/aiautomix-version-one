@@ -75,7 +75,7 @@ export default async function AdminEntitlementsPage() {
           </thead>
           <tbody>
             {features.map((feature) => (
-              <tr key={feature} className="hover:bg-white/[0.02]">
+              <tr key={feature} className="hover:bg-fill-1">
                 <Td className="font-medium">{feature.replace(/_/g, " ")}</Td>
                 {plans.map((plan) => {
                   const entry = byFeature.get(feature)?.get(plan.id);
@@ -87,7 +87,7 @@ export default async function AdminEntitlementsPage() {
                       {denied ? (
                         <span className="text-muted-strong">Not included</span>
                       ) : entry.limit_value === null ? (
-                        <span className="text-brand-cyan">Unlimited</span>
+                        <span className="text-accent">Unlimited</span>
                       ) : (
                         <span>{entry.limit_value.toLocaleString("en-US")}</span>
                       )}

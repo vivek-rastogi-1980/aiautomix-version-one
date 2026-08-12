@@ -82,7 +82,7 @@ export function UsageSummaryPanel({ summary }: UsageSummaryPanelProps) {
           <table className="w-full min-w-[34rem] text-left text-sm">
             <caption className="sr-only">Usage by workflow</caption>
             <thead>
-              <tr className="border-b border-white/[0.08] text-xs uppercase tracking-wide text-muted-strong">
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-muted-strong">
                 <th scope="col" className="px-5 py-3 font-medium">
                   Workflow
                 </th>
@@ -104,7 +104,7 @@ export function UsageSummaryPanel({ summary }: UsageSummaryPanelProps) {
               {byWorkflow.map((entry) => (
                 <tr
                   key={entry.workflow}
-                  className="border-b border-white/[0.05] last:border-0"
+                  className="border-b border-line last:border-0"
                 >
                   <th
                     scope="row"

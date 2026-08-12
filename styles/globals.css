@@ -3,11 +3,126 @@
 @tailwind utilities;
 
 /*
+ * ---------------------------------------------------------------------------
+ * Theme tokens
+ * ---------------------------------------------------------------------------
+ * `:root` holds the DARK values, unchanged from the original palette. Light is
+ * an override applied by `[data-theme="light"]`, which is set only on the
+ * dashboard and admin shells.
+ *
+ * That direction matters. Dark stays the default for everything, so the 24
+ * migrated marketing pages — which paint themselves with inline hex and never
+ * set `data-theme` — cannot be affected by this file no matter what the user
+ * picks. The light theme reaches exactly the two surfaces it was asked to
+ * reach.
+ *
+ * The `--line-*` and `--fill-*` scales replace hardcoded `white/[0.06]`-style
+ * utilities. Those were invisible in light mode: white at 6% over a white
+ * background is nothing, so every border and hover state would have vanished.
+ * As tokens they invert to a dark alpha instead, keeping the same visual
+ * weight against the opposite background.
+ */
+:root {
+  /*
+   * Solid colours are stored as space-separated RGB CHANNELS, not hex, so
+   * Tailwind can inject an alpha and `bg-ink/75` keeps working. A plain
+   * `var(--ink)` holding a hex would silently break every opacity modifier
+   * already in the codebase — the sticky headers depend on them.
+   */
+  --ink-rgb: 10 11 15;
+  --surface-rgb: 17 18 25;
+  --foreground-rgb: 244 243 247;
+  --muted-rgb: 138 135 160;
+  /*
+   * Nudged from #6E6C7C to meet WCAG AA. `muted-strong` labels small print at
+   * text-xs, which is below the large-text threshold and so needs 4.5:1, not
+   * 3:1. The original measured 3.84:1 against the page background — a
+   * pre-existing failure that the light-theme contrast audit surfaced.
+   */
+  --muted-strong-rgb: 122 120 136;
+
+  /* Hairlines and dividers. */
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+
+  /* Surface fills, lightest to heaviest: card tint → hover → pressed. */
+  --fill-1: rgba(255, 255, 255, 0.02);
+  --fill-2: rgba(255, 255, 255, 0.04);
+  --fill-3: rgba(255, 255, 255, 0.06);
+  --fill-4: rgba(255, 255, 255, 0.08);
+  --fill-5: rgba(255, 255, 255, 0.12);
+  --fill-6: rgba(255, 255, 255, 0.18);
+
+  /*
+   * Link/accent colour. Separate from `--brand-cyan` because the brand cyan is
+   * tuned for a near-black background: on white it measures about 1.9:1, well
+   * under the 4.5:1 WCAG AA needs for body text. Light mode substitutes a
+   * darker blue of the same hue family rather than shipping unreadable links.
+   */
+  --accent: #57c7ff;
+  --accent-hover: #8ad9ff;
+
+  --danger-text: #fca5a5;
+  --danger-border: rgba(239, 68, 68, 0.4);
+  --danger-fill: rgba(239, 68, 68, 0.1);
+
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --ink-rgb: 247 247 251;
+  --surface-rgb: 255 255 255;
+  --foreground-rgb: 20 21 28;
+  --muted-rgb: 90 88 114;
+  --muted-strong-rgb: 113 111 138;
+
+  --line: rgba(16, 18, 27, 0.1);
+  --line-strong: rgba(16, 18, 27, 0.18);
+
+  --fill-1: rgba(16, 18, 27, 0.025);
+  --fill-2: rgba(16, 18, 27, 0.045);
+  --fill-3: rgba(16, 18, 27, 0.06);
+  --fill-4: rgba(16, 18, 27, 0.08);
+  --fill-5: rgba(16, 18, 27, 0.11);
+  --fill-6: rgba(16, 18, 27, 0.16);
+
+  --accent: #0a63b0;
+  --accent-hover: #084b86;
+
+  --danger-text: #b42318;
+  --danger-border: rgba(180, 35, 24, 0.35);
+  --danger-fill: rgba(180, 35, 24, 0.06);
+
+  color-scheme: light;
+}
+
+/*
  * Global rules shared by every migrated page (identical in all 24 original
  * design files). Page-specific keyframes/media queries live next to each
  * feature in a scoped <PageStyles> block for pixel fidelity.
+ *
+ * The body background is the dark ink literal rather than `var(--ink)`: the
+ * themed shells paint their own full-height background, and keeping the body
+ * fixed means an overscroll bounce on a marketing page can never flash light.
  */
 body {
   margin: 0;
   background: #0a0b0f;
+}
+
+/*
+ * A themed shell owns the viewport background, so overscroll matches the theme
+ * the user chose rather than showing the body's dark ink behind it.
+ */
+[data-theme] {
+  background: rgb(var(--ink-rgb));
+}
+
+/* Respect the OS setting for motion in the theme transition. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme] {
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
 }

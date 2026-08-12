@@ -29,6 +29,8 @@ import {
   ROLE_LABELS,
   type AdminRole,
 } from "@/features/admin/permissions";
+import { ThemeToggle } from "@/features/theme/theme-toggle";
+import type { Theme } from "@/lib/theme";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -49,6 +51,8 @@ interface AdminShellProps {
   email: string;
   /** Already filtered by permission on the server. */
   nav: AdminNavItem[];
+  /** Resolved server-side from the cookie, so the first paint is correct. */
+  theme: Theme;
   children: ReactNode;
 }
 
@@ -97,8 +101,8 @@ function NavList({
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
               active
-                ? "bg-white/[0.08] font-medium text-foreground"
-                : "text-muted hover:bg-white/[0.04] hover:text-foreground",
+                ? "bg-fill-4 font-medium text-foreground"
+                : "text-muted hover:bg-fill-2 hover:text-foreground",
             )}
           >
             <Icon className="size-4 shrink-0" />
@@ -156,19 +160,25 @@ function Breadcrumbs() {
   );
 }
 
-export function AdminShell({ role, email, nav, children }: AdminShellProps) {
+export function AdminShell({
+  role,
+  email,
+  nav,
+  theme,
+  children,
+}: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-ink text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[0.06] bg-surface/60 px-4 py-6 lg:flex">
+    <div data-theme={theme} className="min-h-screen bg-ink text-foreground">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-line bg-surface/60 px-4 py-6 lg:flex">
         <div className="px-2">
           <Brand />
         </div>
         <div className="mt-8 flex-1 overflow-y-auto">
           <NavList nav={nav} />
         </div>
-        <div className="mt-4 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+        <div className="mt-4 rounded-lg border border-line bg-fill-1 px-3 py-2.5">
           <p className="truncate text-xs text-muted" title={email}>
             {email}
           </p>
@@ -191,14 +201,14 @@ export function AdminShell({ role, email, nav, children }: AdminShellProps) {
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-white/[0.06] bg-surface px-4 py-6">
+          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-line bg-surface px-4 py-6">
             <div className="flex items-center justify-between px-2">
               <Brand />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 aria-label="Close menu"
-                className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-white/[0.06] hover:text-foreground"
+                className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-fill-3 hover:text-foreground"
               >
                 <X className="size-5" />
               </button>
@@ -206,7 +216,7 @@ export function AdminShell({ role, email, nav, children }: AdminShellProps) {
             <div className="mt-8 flex-1 overflow-y-auto">
               <NavList nav={nav} onNavigate={() => setMobileOpen(false)} />
             </div>
-            <div className="mt-4 rounded-lg border border-white/[0.06] px-3 py-2.5">
+            <div className="mt-4 rounded-lg border border-line px-3 py-2.5">
               <p className="truncate text-xs text-muted">{email}</p>
               <div className="mt-1.5">
                 <Badge variant={ROLE_BADGE[role]}>{ROLE_LABELS[role]}</Badge>
@@ -217,17 +227,18 @@ export function AdminShell({ role, email, nav, children }: AdminShellProps) {
       ) : null}
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/[0.06] bg-ink/80 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-line bg-ink/80 px-4 backdrop-blur sm:px-6">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-white/[0.06] hover:text-foreground lg:hidden"
+            className="inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-fill-3 hover:text-foreground lg:hidden"
           >
             <Menu className="size-5" />
           </button>
           <Breadcrumbs />
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle theme={theme} />
             <Badge variant={ROLE_BADGE[role]}>{ROLE_LABELS[role]}</Badge>
           </div>
         </header>

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireAdmin } from "@/features/admin/guard";
 import { AdminShell } from "@/features/admin/admin-shell";
 import { ADMIN_NAV } from "@/features/admin/nav";
+import { getTheme } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: { default: "Admin", template: "%s · AIAutomix Admin" },
@@ -35,6 +36,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const { role, user, has } = await requireAdmin();
+  const theme = await getTheme();
 
   // Filtered server-side: a link a role cannot use never reaches the browser,
   // so the nav does not disclose the shape of the panel to a lesser role.
@@ -43,7 +45,12 @@ export default async function AdminLayout({
   );
 
   return (
-    <AdminShell role={role} email={user.email ?? ""} nav={[...nav]}>
+    <AdminShell
+      role={role}
+      email={user.email ?? ""}
+      nav={[...nav]}
+      theme={theme}
+    >
       {children}
     </AdminShell>
   );
