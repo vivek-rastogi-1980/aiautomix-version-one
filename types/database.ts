@@ -628,6 +628,138 @@ export type AdminAuditLogRow = {
   created_at: string;
 };
 
+// ---------------------------------------------------------------------------
+// Market Research (migration 0009)
+// ---------------------------------------------------------------------------
+
+export type ResearchDepthRow = {
+  id: string;
+  label: string;
+  description: string;
+  max_sources: number;
+  max_queries: number;
+  stage_timeout_ms: number;
+  max_attempts: number;
+  sort_order: number;
+  is_active: boolean;
+};
+
+export type ResearchStageCostRow = {
+  depth: string;
+  stage: string;
+  credits: number;
+};
+
+export type ResearchRequestRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_idea_id: string | null;
+  business_plan_id: string | null;
+  title: string;
+  scope: string | null;
+  industry: string | null;
+  geography: string | null;
+  target_customer: string | null;
+  business_model: string | null;
+  questions: unknown;
+  depth: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResearchRunRow = {
+  id: string;
+  research_request_id: string;
+  workspace_id: string;
+  status: string;
+  /** The resume point. Null once the run finishes. */
+  current_stage: string | null;
+  depth: string;
+  credits_charged: number;
+  credits_refunded: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  source_count: number;
+  evidence_count: number;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResearchRunStageRow = {
+  id: string;
+  run_id: string;
+  workspace_id: string;
+  stage: string;
+  /** A retry is a new attempt with its own charge. */
+  attempt: number;
+  status: string;
+  ai_usage_log_id: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  prompt_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  duration_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type ResearchSourceRow = {
+  id: string;
+  research_request_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  url: string;
+  canonical_url: string;
+  title: string | null;
+  publisher: string | null;
+  source_type: string;
+  /** Nullable: a missing publication date is recorded, never invented. */
+  published_at: string | null;
+  retrieved_at: string;
+  status: string;
+  /** Retrieval metadata only — never raw page content. */
+  metadata: unknown;
+  created_at: string;
+};
+
+export type ResearchEvidenceRow = {
+  id: string;
+  research_request_id: string;
+  workspace_id: string;
+  /** NOT NULL by design: a citation with no source row cannot be stored. */
+  source_id: string;
+  section_key: string;
+  claim: string;
+  evidence_reference: string | null;
+  confidence: string;
+  is_contradictory: boolean;
+  contradicts_id: string | null;
+  created_at: string;
+};
+
+export type ResearchResultRow = {
+  id: string;
+  research_request_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  section_key: string;
+  structured_content: unknown;
+  confidence: string;
+  status: string;
+  version: number;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -789,6 +921,79 @@ export interface Database {
         Update: Partial<AdminAuditLogRow>;
         Relationships: [];
       };
+      research_depths: {
+        Row: ResearchDepthRow;
+        Insert: ResearchDepthRow;
+        Update: Partial<ResearchDepthRow>;
+        Relationships: [];
+      };
+      research_stage_costs: {
+        Row: ResearchStageCostRow;
+        Insert: ResearchStageCostRow;
+        Update: Partial<ResearchStageCostRow>;
+        Relationships: [];
+      };
+      research_requests: {
+        Row: ResearchRequestRow;
+        Insert: Omit<ResearchRequestRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<ResearchRequestRow>;
+        Relationships: [];
+      };
+      research_runs: {
+        Row: ResearchRunRow;
+        Insert: Omit<ResearchRunRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<ResearchRunRow>;
+        Relationships: [];
+      };
+      research_run_stages: {
+        Row: ResearchRunStageRow;
+        Insert: Omit<ResearchRunStageRow, "id" | "started_at"> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<ResearchRunStageRow>;
+        Relationships: [];
+      };
+      research_sources: {
+        Row: ResearchSourceRow;
+        Insert: Omit<
+          ResearchSourceRow,
+          "id" | "created_at" | "retrieved_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          retrieved_at?: string;
+        };
+        Update: Partial<ResearchSourceRow>;
+        Relationships: [];
+      };
+      research_evidence: {
+        Row: ResearchEvidenceRow;
+        Insert: Omit<ResearchEvidenceRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<ResearchEvidenceRow>;
+        Relationships: [];
+      };
+      research_results: {
+        Row: ResearchResultRow;
+        Insert: Omit<ResearchResultRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<ResearchResultRow>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
@@ -876,6 +1081,67 @@ export interface Database {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;
       };
+
+      // --- Migration 0009: market research ------------------------------
+      /** Total credits for a full run at this depth, summed from the same
+       *  rows the stage engine charges against. */
+      research_estimate_credits: {
+        Args: { p_depth: string };
+        Returns: number;
+      };
+
+      // --- Migration 0010: stage engine ---------------------------------
+      /**
+       * Atomically claims the next executable stage. The row lock inside is
+       * what stops two concurrent requests running the same stage.
+       */
+      research_claim_stage: {
+        Args: {
+          p_run_id: string;
+          p_max_attempts?: number;
+          p_lock_timeout_ms?: number;
+        };
+        Returns: {
+          stage: string;
+          attempt: number;
+          depth: string;
+          workspace_id: string;
+          request_id: string;
+        }[];
+      };
+      /** Persists results, sources and evidence AND advances, in one transaction. */
+      research_complete_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_next_stage: string | null;
+          p_results?: unknown;
+          p_sources?: unknown;
+          p_evidence?: unknown;
+          p_usage?: unknown;
+        };
+        Returns: {
+          sources_added: number;
+          evidence_added: number;
+          next_stage: string | null;
+        };
+      };
+      /** Records a failure and releases the lock WITHOUT advancing. */
+      research_fail_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_error_code: string;
+          p_error_message: string;
+          p_terminal?: boolean;
+          p_usage?: unknown;
+        };
+        Returns: undefined;
+      };
+      /** Creates or reuses the single active run for a request. */
+      research_start_run: { Args: { p_request_id: string }; Returns: string };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
