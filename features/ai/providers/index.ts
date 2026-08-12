@@ -91,3 +91,57 @@ export function createProvider(id: ProviderId, model?: string): AiProvider {
 export function getProviderLabel(id: string): string {
   return PROVIDERS[id as ProviderId]?.label ?? id;
 }
+
+// ---------------------------------------------------------------------------
+// Retrieval capability (Sprint 8)
+// ---------------------------------------------------------------------------
+
+/**
+ * Does this provider instance support web-backed research?
+ *
+ * `research()` is optional on `AiProvider` because retrieval is a capability
+ * rather than a universal feature. A provider without web search declares that
+ * by not implementing the method, instead of implementing one that returns
+ * model-invented URLs.
+ */
+export function supportsResearch(provider: AiProvider): boolean {
+  return typeof provider.research === "function";
+}
+
+/** True when the named provider is configured *and* can retrieve. */
+export function isResearchProviderConfigured(id: ProviderId): boolean {
+  if (!isProviderConfigured(id)) return false;
+  try {
+    return supportsResearch(createProvider(id));
+  } catch {
+    return false;
+  }
+}
+
+/** True when this deployment can run the Market Research workflow at all. */
+export function isResearchConfigured(): boolean {
+  return isResearchProviderConfigured(getDefaultProviderId());
+}
+
+/**
+ * Build a provider that is guaranteed to support retrieval.
+ *
+ * The Market Research workflow uses this rather than `createProvider`, so a
+ * deployment pointed at a provider without web search fails with a clear typed
+ * error at the boundary — not halfway through a charged run.
+ */
+export function createResearchProvider(
+  id: ProviderId,
+  model?: string,
+): AiProvider & Required<Pick<AiProvider, "research">> {
+  const provider = createProvider(id, model);
+
+  if (!supportsResearch(provider)) {
+    throw new AiError(
+      "AI_PROVIDER_UNSUPPORTED",
+      `The ${getProviderLabel(id)} provider does not support web research in this release.`,
+    );
+  }
+
+  return provider as AiProvider & Required<Pick<AiProvider, "research">>;
+}

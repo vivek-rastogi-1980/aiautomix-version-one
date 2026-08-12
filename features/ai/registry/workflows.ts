@@ -13,6 +13,7 @@ import {
   businessPlanInputSchema,
   toPlanPromptVariables,
 } from "@/lib/validations/business-plan";
+import { RESEARCH_WORKFLOWS } from "@/features/research/stages/workflows";
 
 /**
  * Workflow Registry (AI-PLATFORM-SPEC.md, WORKFLOW-MANAGER-SPEC.md).
@@ -52,6 +53,11 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
     // Eleven prose sections do not fit in the platform default of 4000.
     maxOutputTokens: 9000,
   },
+
+  // Sprint 8: the seven Market Research stages. Registered here like any other
+  // AI product, so the stage engine gets validation, retries, usage logging and
+  // cost estimation from the platform rather than reimplementing them.
+  ...RESEARCH_WORKFLOWS,
 };
 
 /**

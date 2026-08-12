@@ -1089,6 +1089,59 @@ export interface Database {
         Args: { p_depth: string };
         Returns: number;
       };
+
+      // --- Migration 0010: stage engine ---------------------------------
+      /**
+       * Atomically claims the next executable stage. The row lock inside is
+       * what stops two concurrent requests running the same stage.
+       */
+      research_claim_stage: {
+        Args: {
+          p_run_id: string;
+          p_max_attempts?: number;
+          p_lock_timeout_ms?: number;
+        };
+        Returns: {
+          stage: string;
+          attempt: number;
+          depth: string;
+          workspace_id: string;
+          request_id: string;
+        }[];
+      };
+      /** Persists results, sources and evidence AND advances, in one transaction. */
+      research_complete_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_next_stage: string | null;
+          p_results?: unknown;
+          p_sources?: unknown;
+          p_evidence?: unknown;
+          p_usage?: unknown;
+        };
+        Returns: {
+          sources_added: number;
+          evidence_added: number;
+          next_stage: string | null;
+        };
+      };
+      /** Records a failure and releases the lock WITHOUT advancing. */
+      research_fail_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_error_code: string;
+          p_error_message: string;
+          p_terminal?: boolean;
+          p_usage?: unknown;
+        };
+        Returns: undefined;
+      };
+      /** Creates or reuses the single active run for a request. */
+      research_start_run: { Args: { p_request_id: string }; Returns: string };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;

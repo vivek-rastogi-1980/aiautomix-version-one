@@ -8,12 +8,15 @@ import {
 import type {
   AiProvider,
   AiUsage,
+  AiCompletion,
+  AiRetrievedSource,
   WorkflowRunInput,
   WorkflowRunMetadata,
   WorkflowRunResult,
 } from "@/features/ai/engine/types";
 import { createProvider, getDefaultProviderId } from "@/features/ai/providers";
 import { buildMessages, loadPrompt } from "@/features/ai/registry/prompts";
+import { createResearchProvider } from "@/features/ai/providers";
 import { getWorkflow } from "@/features/ai/registry/workflows";
 import { estimateCostUsd } from "@/features/ai/usage/pricing";
 import { recordWorkflowRun } from "@/features/ai/usage/tracker";
@@ -72,10 +75,23 @@ export async function runWorkflow<TOutput>(
     );
   }
 
-  // 3. Model selection.
+  // 3. Model selection. A retrieval workflow demands a provider that can
+  //    actually search; `createResearchProvider` fails loudly at this boundary
+  //    rather than halfway through a charged run.
   const providerId = workflow.provider ?? getDefaultProviderId();
+  const needsResearch = workflow.capability === "research";
   const provider =
-    providerOverride ?? createProvider(providerId, workflow.model);
+    providerOverride ??
+    (needsResearch
+      ? createResearchProvider(providerId, workflow.model)
+      : createProvider(providerId, workflow.model));
+
+  if (needsResearch && typeof provider.research !== "function") {
+    throw new AiError(
+      "AI_PROVIDER_UNSUPPORTED",
+      `Workflow ${workflow.id} requires web research, which this provider does not support.`,
+    );
+  }
 
   // 4. Prompt assembly from the versioned registry.
   const template = await loadPrompt(workflow.id, workflow.promptVersion);
@@ -85,16 +101,33 @@ export async function runWorkflow<TOutput>(
   let lastError: AiError = new AiError("AI_PROVIDER_ERROR");
   let usage: AiUsage = EMPTY_USAGE;
   let model = provider.model;
+  let sources: AiRetrievedSource[] = [];
 
   while (attempts < MAX_ATTEMPTS) {
     attempts += 1;
     try {
-      // 5. Provider call.
-      const completion = await provider.complete({
-        messages,
-        temperature: workflow.temperature,
-        maxOutputTokens: workflow.maxOutputTokens,
-      });
+      // 5. Provider call — one of two shapes, chosen by the workflow.
+      let completion: AiCompletion;
+      if (needsResearch) {
+        // The prompt's system half carries the instructions; the user half
+        // carries the (already fenced) brief. Same template, same fencing —
+        // only the transport differs.
+        const research = await provider.research!({
+          instructions: messages[0]?.content ?? "",
+          input: messages[1]?.content ?? "",
+          maxSources: workflow.maxSources,
+          maxOutputTokens: workflow.maxOutputTokens,
+        });
+        completion = research;
+        // Sources come from the provider's citations, never from `data`.
+        sources = research.sources;
+      } else {
+        completion = await provider.complete({
+          messages,
+          temperature: workflow.temperature,
+          maxOutputTokens: workflow.maxOutputTokens,
+        });
+      }
       usage = completion.usage;
       model = completion.model;
 
@@ -136,7 +169,7 @@ export async function runWorkflow<TOutput>(
         output: data,
       });
 
-      return { data, metadata, requestId };
+      return { data, metadata, requestId, sources };
     } catch (error) {
       lastError = toAiError(error);
 
