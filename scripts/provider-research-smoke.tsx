@@ -190,21 +190,37 @@ async function main(): Promise<void> {
   );
 
   // The research feature must not reach the network itself.
+  //
+  // Phase 4 added a client component that calls the app's own `run-stage`
+  // route, so a blanket ban on `fetch(` would now fail for the wrong reason.
+  // The guarantee that actually matters is narrower and unchanged: research
+  // code may only address THIS origin by relative path. A literal `http(s)://`
+  // target, or any HTTP client library, means the feature has started talking
+  // to somewhere the AI platform does not control — which is the thing the
+  // provider layer exists to be the only holder of.
   const researchDir = path.join(process.cwd(), "features/research");
-  let researchFetches: string[] = [];
+  const researchFetches: string[] = [];
   try {
     for (const entry of readdirSync(researchDir)) {
       if (!/\.(ts|tsx)$/.test(entry)) continue;
       const body = readFileSync(path.join(researchDir, entry), "utf8");
-      if (/\bfetch\(|axios|undici|node-fetch/.test(body)) {
-        researchFetches.push(entry);
+
+      if (/axios|undici|node-fetch|https?\.request\(/.test(body)) {
+        researchFetches.push(`${entry} (http client)`);
+        continue;
+      }
+
+      // Every fetch target must be a relative path starting `/api/`.
+      for (const call of body.match(/\bfetch\(\s*[^)]{0,120}/g) ?? []) {
+        const relative = /fetch\(\s*[`'"]\/api\//.test(call);
+        if (!relative) researchFetches.push(`${entry} (${call.slice(0, 40)})`);
       }
     }
   } catch {
-    researchFetches = [];
+    // Directory absent — nothing to scan.
   }
   check(
-    "features/research performs no direct HTTP",
+    "features/research reaches no origin but its own",
     researchFetches.length === 0,
     researchFetches.join(", ") || "clean",
   );
