@@ -1358,6 +1358,13 @@ export interface Database {
         Returns: Record<string, number | string>;
       };
 
+      // --- Migration 0015: competitor admin observability ---------------
+      /** Competitor operational counters for the admin dashboard. */
+      admin_competitor_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+
       // --- Migration 0014: competitor intelligence ----------------------
       /** Total credits for a full competitor run at this depth. */
       competitor_estimate_credits: {

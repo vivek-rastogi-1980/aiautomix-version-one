@@ -1,4 +1,10 @@
-import { ExternalLink, ShieldCheck, ShieldAlert, ShieldX, Clock } from "lucide-react";
+import {
+  ExternalLink,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  Clock,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -39,7 +45,11 @@ import type { CompetitorRow } from "@/types/database";
 
 const VERIFICATION_META: Record<
   VerificationStatus,
-  { icon: typeof ShieldCheck; variant: "active" | "completed" | "archived" | "neutral"; className: string }
+  {
+    icon: typeof ShieldCheck;
+    variant: "active" | "completed" | "archived" | "neutral";
+    className: string;
+  }
 > = {
   VERIFIED: {
     icon: ShieldCheck,
@@ -105,7 +115,11 @@ interface ProfileShape {
 
 interface PricingShape {
   model?: unknown;
-  plans?: { planName?: unknown; displayedPrice?: unknown; billingFrequency?: unknown }[];
+  plans?: {
+    planName?: unknown;
+    displayedPrice?: unknown;
+    billingFrequency?: unknown;
+  }[];
   freeTrial?: unknown;
   freePlan?: unknown;
   enterpriseCustom?: unknown;
@@ -212,7 +226,10 @@ export function CompetitorCard({ competitor }: { competitor: CompetitorRow }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={TYPE_VARIANT[type]} title={COMPETITOR_TYPE_MEANING[type]}>
+            <Badge
+              variant={TYPE_VARIANT[type]}
+              title={COMPETITOR_TYPE_MEANING[type]}
+            >
               {COMPETITOR_TYPE_LABELS[type]}
             </Badge>
             {/* The verification state is a word plus an icon, never colour

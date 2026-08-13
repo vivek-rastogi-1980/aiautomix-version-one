@@ -9,6 +9,7 @@ import { buildBusinessValidatorReportModel } from "@/features/reports/report-def
 import { ReportRenderer } from "@/features/ai/renderer/report-renderer";
 import { DownloadPdfButton } from "@/features/ai/pdf/download-pdf-button";
 import { StartResearchLink } from "@/features/research/start-research-link";
+import { StartCompetitorsLink } from "@/features/competitors/start-competitors-link";
 import { FormAlert } from "@/components/ui/form-message";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 
@@ -57,6 +58,7 @@ export default async function ReportPage({ params }: PageProps) {
               {/* The validated idea is the natural starting point for market
                   research, so the handoff lives where the verdict is read. */}
               {idea ? <StartResearchLink ideaId={idea.id} /> : null}
+              {idea ? <StartCompetitorsLink ideaId={idea.id} /> : null}
               <DownloadPdfButton
                 href={`/api/reports/${record.id}/pdf`}
                 title={title}

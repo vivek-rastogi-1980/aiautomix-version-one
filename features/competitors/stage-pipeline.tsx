@@ -235,7 +235,9 @@ export function CompetitorStagePipeline({
           {outcome.discardedCandidates?.length ? (
             <span className="mt-1 block text-xs opacity-90">
               {outcome.discardedCandidates.length} suggested name
-              {outcome.discardedCandidates.length === 1 ? " was" : "s were"}{" "}
+              {outcome.discardedCandidates.length === 1
+                ? " was"
+                : "s were"}{" "}
               discarded because no search result backed{" "}
               {outcome.discardedCandidates.length === 1 ? "it" : "them"}.
             </span>

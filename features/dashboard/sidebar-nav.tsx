@@ -14,6 +14,7 @@ import {
   NotebookPen,
   Settings,
   Sparkles,
+  Swords,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/validator", label: "Idea Validator", icon: Sparkles },
   { href: "/plans", label: "Business Plans", icon: NotebookPen },
   { href: "/research", label: "Market Research", icon: Microscope },
+  { href: "/competitors", label: "Competitors", icon: Swords },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/ai/history", label: "AI activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },
