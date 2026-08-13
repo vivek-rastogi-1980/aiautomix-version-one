@@ -68,6 +68,62 @@ export interface KeyValueEntry {
   value: string;
 }
 
+// ---------------------------------------------------------------------------
+// Evidence vocabulary (Sprint 8 Phase 5)
+//
+// Added for Market Research, but deliberately generic: any workflow whose
+// output is traceable to sources can use these, and the two renderers gained
+// one implementation each rather than the research feature gaining a private
+// renderer. That is the extension path this file has always described —
+// "add a kind here and to both renderers".
+// ---------------------------------------------------------------------------
+
+/**
+ * How a statement relates to its evidence.
+ *
+ * This is the distinction the whole research product exists to preserve, so it
+ * is part of the document model rather than something a renderer infers. A
+ * renderer may style these differently; it may not promote one into another.
+ */
+export type ClaimKind = "FACT" | "INFERENCE" | "RECOMMENDATION";
+
+/**
+ * Confidence in a finding.
+ *
+ * `insufficient` is a first-class value, not the absence of one. A report that
+ * could only express three grades of confidence would have to round "we looked
+ * and could not support this" up to "low", which is the specific dishonesty the
+ * evidence model is built to prevent.
+ */
+export type ReportConfidence = "high" | "medium" | "low" | "insufficient";
+
+/** A citation attached to a finding. `url` is validated by the builder. */
+export interface EvidenceCitation {
+  label: string;
+  url?: string;
+  publisher?: string;
+  /** Publication date as stored. Absent means unknown — never inferred. */
+  publishedAt?: string;
+}
+
+export interface FindingEntry {
+  text: string;
+  kind: ClaimKind;
+  confidence?: ReportConfidence;
+  /** Supporting sources. Empty is meaningful and is rendered as such. */
+  citations?: EvidenceCitation[];
+}
+
+/** A row in the Evidence & Sources index. */
+export interface SourceEntry {
+  title: string;
+  publisher?: string;
+  url?: string;
+  sourceType?: string;
+  publishedAt?: string;
+  retrievedAt?: string;
+}
+
 /** The renderable content types. Add a kind here and to both renderers. */
 export type ReportBlock =
   | { kind: "paragraph"; text: string }
@@ -76,7 +132,58 @@ export type ReportBlock =
   | { kind: "swot"; content: SwotContent }
   | { kind: "ranked"; levelLabel?: string; entries: RankedEntry[] }
   | { kind: "timeline"; entries: TimelineEntry[] }
-  | { kind: "keyValues"; entries: KeyValueEntry[] };
+  | { kind: "keyValues"; entries: KeyValueEntry[] }
+  | { kind: "findings"; entries: FindingEntry[] }
+  | { kind: "sources"; entries: SourceEntry[] }
+  /**
+   * A stated caveat: insufficient evidence, sources that disagree, a chart that
+   * could not honestly be drawn. It is a block rather than prose because these
+   * must survive into the PDF looking like warnings, not like sentences a
+   * reader can skim past.
+   */
+  | { kind: "callout"; tone: ReportTone; title: string; text: string };
+
+/** Human wording for each claim kind. Shared by both renderers. */
+export const CLAIM_KIND_LABEL: Record<ClaimKind, string> = {
+  FACT: "Fact",
+  INFERENCE: "Inference",
+  RECOMMENDATION: "Recommendation",
+};
+
+export const CLAIM_KIND_MEANING: Record<ClaimKind, string> = {
+  FACT: "Directly supported by a cited source.",
+  INFERENCE: "A reasoned conclusion drawn from the evidence.",
+  RECOMMENDATION: "A proposed action, not a finding.",
+};
+
+export const CONFIDENCE_LABEL: Record<ReportConfidence, string> = {
+  high: "High confidence",
+  medium: "Medium confidence",
+  low: "Low confidence",
+  insufficient: "Insufficient evidence",
+};
+
+/** Confidence as a tone. Used for colour, never as the only signal. */
+export const CONFIDENCE_TONE: Record<ReportConfidence, ReportTone> = {
+  high: "positive",
+  medium: "caution",
+  low: "negative",
+  insufficient: "neutral",
+};
+
+/**
+ * Confidence as a 0–3 meter position.
+ *
+ * Three steps, not a percentage: the research engine grades confidence
+ * ordinally, and rendering it as "67%" would imply a measurement nobody made.
+ */
+export const CONFIDENCE_STEPS = 3;
+export const CONFIDENCE_STEP: Record<ReportConfidence, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+  insufficient: 0,
+};
 
 export interface ReportSection {
   id: string;

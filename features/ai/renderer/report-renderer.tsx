@@ -1,5 +1,8 @@
+import { FindingsList } from "@/features/ai/renderer/blocks/findings-list";
 import { InsightCard } from "@/features/ai/renderer/blocks/insight-card";
 import { KeyValues } from "@/features/ai/renderer/blocks/key-values";
+import { ReportCallout } from "@/features/ai/renderer/blocks/report-callout";
+import { SourceIndex } from "@/features/ai/renderer/blocks/source-index";
 import { MetricBars } from "@/features/ai/renderer/blocks/metric-bars";
 import { RankedList } from "@/features/ai/renderer/blocks/ranked-list";
 import { ReportFooter } from "@/features/ai/renderer/blocks/report-footer";
@@ -74,6 +77,22 @@ function renderBlock(block: ReportBlock, key: string): React.ReactNode {
 
     case "keyValues":
       return <KeyValues key={key} entries={block.entries} />;
+
+    case "findings":
+      return <FindingsList key={key} entries={block.entries} />;
+
+    case "sources":
+      return <SourceIndex key={key} entries={block.entries} />;
+
+    case "callout":
+      return (
+        <ReportCallout
+          key={key}
+          tone={block.tone}
+          title={block.title}
+          text={block.text}
+        />
+      );
   }
 }
 

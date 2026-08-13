@@ -81,8 +81,8 @@ export default async function NewResearchPage({
 
       {requestedPrefill && !prefill ? (
         <FormAlert variant="error">
-          That business idea or plan could not be found in this workspace, so the
-          form has been left blank.
+          That business idea or plan could not be found in this workspace, so
+          the form has been left blank.
         </FormAlert>
       ) : null}
 

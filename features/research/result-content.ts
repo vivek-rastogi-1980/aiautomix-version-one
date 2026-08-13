@@ -60,7 +60,8 @@ function asStringList(value: unknown): string[] {
 
 function isClaimLabel(value: unknown): value is ClaimLabel {
   return (
-    typeof value === "string" && (CLAIM_LABELS as readonly string[]).includes(value)
+    typeof value === "string" &&
+    (CLAIM_LABELS as readonly string[]).includes(value)
   );
 }
 
@@ -109,11 +110,7 @@ function asPoints(value: unknown): LabelledPoint[] {
     .slice(0, MAX_ITEMS);
 }
 
-function pushList(
-  blocks: ContentBlock[],
-  title: string,
-  value: unknown,
-): void {
+function pushList(blocks: ContentBlock[], title: string, value: unknown): void {
   const items = asStringList(value);
   if (items.length) blocks.push({ kind: "list", title, items });
 }
@@ -167,7 +164,11 @@ export function toContentBlocks(content: unknown): ContentBlock[] {
       .filter((item): item is string => item !== null)
       .slice(0, MAX_ITEMS);
     if (findings.length) {
-      blocks.push({ kind: "list", title: "What the search found", items: findings });
+      blocks.push({
+        kind: "list",
+        title: "What the search found",
+        items: findings,
+      });
     }
   }
   pushList(blocks, "Searches run", record.queriesUsed);
@@ -177,7 +178,11 @@ export function toContentBlocks(content: unknown): ContentBlock[] {
   // --- Evidence extraction ----------------------------------------------
   // Surfaced, not suppressed: these are the claims the evidence would NOT
   // support, and hiding them is how a research tool starts lying.
-  pushList(blocks, "Claims the sources did not support", record.unsupportedClaims);
+  pushList(
+    blocks,
+    "Claims the sources did not support",
+    record.unsupportedClaims,
+  );
   pushList(blocks, "Contradictions between sources", record.contradictions);
 
   // --- Synthesis ----------------------------------------------------------

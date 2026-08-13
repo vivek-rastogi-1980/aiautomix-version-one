@@ -10,10 +10,16 @@ import {
 import { PDF_BRAND } from "@/features/ai/pdf/brand";
 import { BRAND_LOGO_PNG_BASE64 } from "@/features/ai/pdf/logo";
 import { TONE_HEX, valueTone } from "@/features/ai/renderer/tone";
-import type {
-  ReportBlock,
-  ReportDocumentModel,
-  ReportSection,
+import {
+  CLAIM_KIND_LABEL,
+  CONFIDENCE_LABEL,
+  CONFIDENCE_STEP,
+  CONFIDENCE_STEPS,
+  CONFIDENCE_TONE,
+  type ClaimKind,
+  type ReportBlock,
+  type ReportDocumentModel,
+  type ReportSection,
 } from "@/features/ai/renderer/types";
 
 /**
@@ -192,7 +198,49 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   itemNote: { fontSize: 9, color: PDF_BRAND.muted, marginTop: 4 },
+
+  // --- Evidence vocabulary (Phase 5) ---------------------------------------
+  finding: { marginBottom: 10 },
+  findingTagRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  findingTag: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: 0.6,
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  findingConfidence: { fontSize: 7, fontFamily: "Helvetica-Bold" },
+  meterRow: { flexDirection: "row", gap: 2, alignItems: "center" },
+  meterStep: { width: 9, height: 3, borderRadius: 1.5 },
+  findingText: { fontSize: 10, marginTop: 4 },
+  findingCite: { fontSize: 8, color: PDF_BRAND.muted, marginTop: 3 },
+
+  sourceRow: { flexDirection: "row", marginBottom: 7, paddingRight: 8 },
+  sourceIndex: { width: 22, fontSize: 8, color: PDF_BRAND.muted },
+  sourceBody: { flex: 1 },
+  sourceTitle: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  sourceMeta: { fontSize: 8, color: PDF_BRAND.muted, marginTop: 1 },
+  sourceUrl: { fontSize: 7, color: PDF_BRAND.violet, marginTop: 1 },
+
+  callout: {
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderRadius: 4,
+    padding: 9,
+    marginBottom: 8,
+  },
+  calloutTitle: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  calloutText: { fontSize: 9, marginTop: 3, color: PDF_BRAND.text },
 });
+
+/** Print colours for the claim labels. Mirrors the HTML renderer's palette. */
+const CLAIM_KIND_HEX: Record<ClaimKind, string> = {
+  FACT: TONE_HEX.positive,
+  INFERENCE: TONE_HEX.caution,
+  RECOMMENDATION: PDF_BRAND.violet,
+};
 
 const SWOT_QUADRANTS = [
   { key: "strengths", label: "Strengths", color: TONE_HEX.positive },
@@ -317,6 +365,138 @@ function Block({ block }: { block: ReportBlock }) {
               <Text style={styles.metaValue}>{entry.value}</Text>
             </View>
           ))}
+        </View>
+      );
+
+    // The FACT / INFERENCE / RECOMMENDATION distinction and the confidence
+    // grade have to survive into print, so both are words here as well as
+    // colours — a report is frequently read as a greyscale printout.
+    case "findings":
+      return (
+        <View>
+          {block.entries.map((entry, index) => {
+            const kindColor = CLAIM_KIND_HEX[entry.kind];
+            const confidence = entry.confidence;
+            const confidenceColor = confidence
+              ? TONE_HEX[CONFIDENCE_TONE[confidence]]
+              : PDF_BRAND.muted;
+
+            return (
+              <View key={index} style={styles.finding} wrap={false}>
+                <View style={styles.findingTagRow}>
+                  <Text
+                    style={[
+                      styles.findingTag,
+                      { color: kindColor, borderColor: kindColor },
+                    ]}
+                  >
+                    {CLAIM_KIND_LABEL[entry.kind].toUpperCase()}
+                  </Text>
+                  {confidence ? (
+                    <>
+                      <View style={styles.meterRow}>
+                        {Array.from({ length: CONFIDENCE_STEPS }).map(
+                          (_, step) => (
+                            <View
+                              key={step}
+                              style={[
+                                styles.meterStep,
+                                {
+                                  backgroundColor:
+                                    step < CONFIDENCE_STEP[confidence]
+                                      ? confidenceColor
+                                      : PDF_BRAND.soft,
+                                },
+                              ]}
+                            />
+                          ),
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.findingConfidence,
+                          { color: confidenceColor },
+                        ]}
+                      >
+                        {CONFIDENCE_LABEL[confidence]}
+                      </Text>
+                    </>
+                  ) : null}
+                </View>
+
+                <Text style={styles.findingText}>{entry.text}</Text>
+
+                {entry.citations?.length ? (
+                  <Text style={styles.findingCite}>
+                    {entry.citations.length === 1 ? "Source: " : "Sources: "}
+                    {entry.citations
+                      .map(
+                        (citation) =>
+                          citation.label +
+                          (citation.publishedAt
+                            ? ` (${citation.publishedAt})`
+                            : ""),
+                      )
+                      .join("; ")}
+                  </Text>
+                ) : entry.kind === "FACT" ? (
+                  <Text style={styles.findingCite}>
+                    No source recorded for this statement.
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      );
+
+    case "sources":
+      return (
+        <View>
+          {block.entries.map((entry, index) => (
+            <View key={index} style={styles.sourceRow} wrap={false}>
+              <Text style={styles.sourceIndex}>[{index + 1}]</Text>
+              <View style={styles.sourceBody}>
+                <Text style={styles.sourceTitle}>{entry.title}</Text>
+                <Text style={styles.sourceMeta}>
+                  {[
+                    entry.publisher,
+                    entry.sourceType,
+                    `Published: ${entry.publishedAt ?? "Not stated"}`,
+                    entry.retrievedAt
+                      ? `Retrieved: ${entry.retrievedAt}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+                {/* The URL is printed rather than linked: a printed report has
+                    to remain checkable off-screen. */}
+                {entry.url ? (
+                  <Text style={styles.sourceUrl}>{entry.url}</Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+
+    case "callout":
+      return (
+        <View
+          style={[
+            styles.callout,
+            {
+              borderColor: TONE_HEX[block.tone],
+              backgroundColor: PDF_BRAND.soft,
+            },
+          ]}
+          wrap={false}
+        >
+          <Text style={[styles.calloutTitle, { color: TONE_HEX[block.tone] }]}>
+            {block.title}
+          </Text>
+          <Text style={styles.calloutText}>{block.text}</Text>
         </View>
       );
   }

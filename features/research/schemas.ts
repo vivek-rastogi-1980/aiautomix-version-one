@@ -30,7 +30,8 @@ const optionalUuid = z
   .transform((value) => (value === "" ? undefined : value))
   .optional()
   .refine(
-    (value) => value === undefined || z.string().uuid().safeParse(value).success,
+    (value) =>
+      value === undefined || z.string().uuid().safeParse(value).success,
     "That is not a valid id.",
   );
 

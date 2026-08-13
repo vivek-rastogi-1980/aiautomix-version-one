@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lightbulb, NotebookPen } from "lucide-react";
+import { ArrowLeft, FileText, Lightbulb, NotebookPen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   getResearchDetail,
@@ -18,6 +19,7 @@ import { ResearchResults } from "@/features/research/research-results";
 import { ResearchSources } from "@/features/research/research-sources";
 import { StagePipeline } from "@/features/research/stage-pipeline";
 import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Market research",
@@ -57,7 +59,8 @@ export default async function ResearchDetailPage({
   const detail = await getResearchDetail(access.workspace.id, id);
   if (!detail) notFound();
 
-  const { request, run, attempts, results, sourceCount, evidenceCount } = detail;
+  const { request, run, attempts, results, sourceCount, evidenceCount } =
+    detail;
 
   const progress = buildRunProgress({
     currentStage: run?.current_stage ?? null,
@@ -111,7 +114,10 @@ export default async function ResearchDetailPage({
                 href="/validator"
                 className="inline-flex items-center gap-1.5 font-semibold text-foreground underline-offset-4 hover:underline"
               >
-                <Lightbulb className="size-4 text-brand-violet" aria-hidden="true" />
+                <Lightbulb
+                  className="size-4 text-brand-violet"
+                  aria-hidden="true"
+                />
                 {detail.idea.title}
               </Link>
             ) : null}
@@ -120,7 +126,10 @@ export default async function ResearchDetailPage({
                 href={`/plans/${detail.plan.id}`}
                 className="inline-flex items-center gap-1.5 font-semibold text-foreground underline-offset-4 hover:underline"
               >
-                <NotebookPen className="size-4 text-brand-violet" aria-hidden="true" />
+                <NotebookPen
+                  className="size-4 text-brand-violet"
+                  aria-hidden="true"
+                />
                 {detail.plan.title}
               </Link>
             ) : null}
@@ -143,12 +152,44 @@ export default async function ResearchDetailPage({
         canRun={access.canCreate}
       />
 
+      {/*
+        The report link appears only when the report stage has a succeeded
+        attempt row. Offering it earlier would send the user to a page that can
+        only tell them to come back.
+      */}
+      {progress.stages.find((s) => s.stage === "report")?.status ===
+      "complete" ? (
+        <ReportReadyCard researchId={request.id} />
+      ) : null}
+
       <ResearchResults results={results} />
 
       <ResearchEvidence page={evidence} />
 
       <ResearchSources page={sources} />
     </div>
+  );
+}
+
+function ReportReadyCard({ researchId }: { researchId: string }) {
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-4 border-brand-violet/30 bg-brand-violet/5 p-6 sm:p-7">
+      <div className="min-w-0">
+        <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+          Market research report
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          All fifteen sections, with every finding labelled and traced to the
+          source it came from. Exportable as a branded PDF.
+        </p>
+      </div>
+      <Link
+        href={`/research/${researchId}/report`}
+        className={cn(buttonVariants({ size: "md" }))}
+      >
+        <FileText className="size-4" /> Open report
+      </Link>
+    </Card>
   );
 }
 
@@ -171,7 +212,9 @@ function Brief({
   creditsCharged,
   creditsRefunded,
 }: {
-  request: NonNullable<Awaited<ReturnType<typeof getResearchDetail>>>["request"];
+  request: NonNullable<
+    Awaited<ReturnType<typeof getResearchDetail>>
+  >["request"];
   questions: string[];
   sourceCount: number;
   evidenceCount: number;
@@ -181,8 +224,14 @@ function Brief({
   const facts: { term: string; value: string }[] = [
     { term: "Industry", value: request.industry || "Not specified" },
     { term: "Geography", value: request.geography || "Not specified" },
-    { term: "Target customer", value: request.target_customer || "Not specified" },
-    { term: "Business model", value: request.business_model || "Not specified" },
+    {
+      term: "Target customer",
+      value: request.target_customer || "Not specified",
+    },
+    {
+      term: "Business model",
+      value: request.business_model || "Not specified",
+    },
     { term: "Depth", value: request.depth },
     {
       term: "Credits used",

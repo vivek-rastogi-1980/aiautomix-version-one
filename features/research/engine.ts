@@ -112,6 +112,78 @@ export async function runNextStage(
     requestId: claimRows[0].request_id,
   };
 
+  return executeClaimedStage(runId, claim, userId);
+}
+
+/**
+ * Re-run the `report` stage alone, on research that already produced a report.
+ *
+ * Regeneration exists because a report can be wrong or stale while the evidence
+ * behind it is fine. Re-running the whole pipeline to fix the wording would
+ * re-charge for two web-search stages and return different sources — a worse
+ * report at a higher price.
+ *
+ * The narrowing lives in SQL (`research_claim_report_regeneration` refuses
+ * anything but a `report` stage on a run that already has a successful one), so
+ * this cannot be used to skip ahead to a report with no evidence behind it. The
+ * `report` workflow reads only stored rows, so nothing here touches the web.
+ *
+ * Everything after the claim is the same code path as an ordinary stage: same
+ * entitlement check, same charge, same persistence, same refund on failure.
+ */
+export async function regenerateReport(
+  requestId: string,
+  userId: string,
+): Promise<StageExecutionResult> {
+  const supabase = await createClient();
+
+  const { data: claimRows, error: claimError } = await supabase.rpc(
+    "research_claim_report_regeneration",
+    {
+      p_request_id: requestId,
+      p_lock_timeout_ms: RESEARCH_STAGE_LOCK_TIMEOUT_MS,
+    },
+  );
+
+  if (claimError || !claimRows?.length) {
+    throw new AiError(
+      "AI_INVALID_INPUT",
+      claimError?.message ??
+        "This research has no completed report to regenerate.",
+      false,
+    );
+  }
+
+  const row = claimRows[0];
+  return executeClaimedStage(
+    row.run_id,
+    {
+      stage: "report",
+      attempt: row.attempt,
+      depth: row.depth,
+      workspaceId: row.workspace_id,
+      requestId: row.request_id,
+    },
+    userId,
+  );
+}
+
+/**
+ * Everything after a stage has been claimed: entitlement, charge, execute,
+ * validate, persist, advance — and on failure, record then refund.
+ *
+ * Extracted so report regeneration reuses it rather than reimplementing it. A
+ * second copy of this sequence would be a second place for the charge/refund
+ * ordering to drift, and a stage that charges without refunding is the kind of
+ * bug users notice on their invoice rather than in a test.
+ */
+async function executeClaimedStage(
+  runId: string,
+  claim: ClaimedStage,
+  userId: string,
+): Promise<StageExecutionResult> {
+  const supabase = await createClient();
+
   const cost = stageCost(claim.depth as never, claim.stage);
   let charged = 0;
 

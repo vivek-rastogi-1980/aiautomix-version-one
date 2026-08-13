@@ -72,7 +72,9 @@ function attempt(
 }
 
 function main(): void {
-  const migration = read("supabase/migrations/0011_sprint8_research_product.sql");
+  const migration = read(
+    "supabase/migrations/0011_sprint8_research_product.sql",
+  );
   const actions = read("features/research/actions.ts");
   const data = read("features/research/data.ts");
   const pipeline = read("features/research/stage-pipeline.tsx");
@@ -111,8 +113,8 @@ function main(): void {
   check(
     "an empty optional field becomes undefined, not an empty string",
     createResearchSchema.safeParse({ ...validInput, industry: "" }).success &&
-      createResearchSchema.safeParse({ ...validInput, industry: "" })
-        .data?.industry === undefined,
+      createResearchSchema.safeParse({ ...validInput, industry: "" }).data
+        ?.industry === undefined,
   );
 
   check(
@@ -130,7 +132,8 @@ function main(): void {
   );
   check(
     "an unknown depth is rejected",
-    !createResearchSchema.safeParse({ ...validInput, depth: "extreme" }).success,
+    !createResearchSchema.safeParse({ ...validInput, depth: "extreme" })
+      .success,
   );
   check(
     "a missing depth is rejected",
@@ -329,7 +332,8 @@ function main(): void {
   );
   check(
     "the pipeline sends no stage in the body (no stage skipping)",
-    /body: "\{\}"/.test(pipeline) && !/body: JSON\.stringify\(\{ stage/.test(pipeline),
+    /body: "\{\}"/.test(pipeline) &&
+      !/body: JSON\.stringify\(\{ stage/.test(pipeline),
   );
   check(
     "the pipeline issues exactly one request per click",
@@ -351,13 +355,24 @@ function main(): void {
     ),
   );
   check(
-    // The product layer must reach the engine only through the Phase 3 HTTP
-    // route. Importing `runNextStage` or `startRun` directly would be a second
-    // execution path with none of the route's authorisation around it.
-    "the product layer does not call the stage engine directly",
-    !/from "@\/features\/research\/engine"/.test(
+    // The rule this protects is about the STAGE-ADVANCE path specifically:
+    // `startRun` + `runNextStage` charge for a stage and move the pointer, and
+    // they must be reachable only through the Phase 3 route, which carries the
+    // authorisation, rate limit and idempotency around them.
+    //
+    // Phase 5 added `regenerateReport`, which a Server Action calls directly.
+    // That is not the same path — it re-runs only the report stage, does its
+    // own entitlement and ownership checks, and the SQL re-derives permission
+    // from auth.uid(). Banning the whole module would have banned that too, so
+    // the check now names the two functions it actually cares about.
+    "the stage-advance path exists only behind the run-stage route",
+    !/\brunNextStage\b|\bstartRun\b/.test(
       actions + data + pipeline + form + listPage + detailPage + newPage,
     ),
+  );
+  check(
+    "no client component imports the server-only stage engine",
+    !/from "@\/features\/research\/engine"/.test(pipeline + form),
   );
   check(
     "the UI does not compute a credit balance",
@@ -576,7 +591,9 @@ function main(): void {
     "an analysis section renders its summary and points",
     toContentBlocks({
       summary: "The market is growing.",
-      points: [{ text: "12% CAGR", label: "FACT", sourceUrl: "https://gov.uk/a" }],
+      points: [
+        { text: "12% CAGR", label: "FACT", sourceUrl: "https://gov.uk/a" },
+      ],
     }).length === 2,
   );
   check(
@@ -592,7 +609,8 @@ function main(): void {
     (() => {
       const blocks = toContentBlocks({ points: [{ text: "Probably big" }] });
       return (
-        blocks[0]?.kind === "points" && blocks[0].items[0]?.label === "INFERENCE"
+        blocks[0]?.kind === "points" &&
+        blocks[0].items[0]?.label === "INFERENCE"
       );
     })(),
   );
@@ -627,7 +645,9 @@ function main(): void {
   check(
     "contradictions between sources are surfaced",
     (() => {
-      const blocks = toContentBlocks({ contradictions: ["A says X, B says Y"] });
+      const blocks = toContentBlocks({
+        contradictions: ["A says X, B says Y"],
+      });
       return blocks[0]?.kind === "list";
     })(),
   );
@@ -647,7 +667,8 @@ function main(): void {
   // SOURCE AND EVIDENCE UI
   // =========================================================================
 
-  const allUi = pipeline + form + sourcesUi + evidenceUi + resultsUi + detailPage;
+  const allUi =
+    pipeline + form + sourcesUi + evidenceUi + resultsUi + detailPage;
 
   check(
     "no research component renders raw HTML",
@@ -723,14 +744,8 @@ function main(): void {
     "the list page has an empty state",
     /No research projects yet/.test(listPage),
   );
-  check(
-    "results have an empty state",
-    /No results yet/.test(resultsUi),
-  );
-  check(
-    "sources have an empty state",
-    /Nothing retrieved yet/.test(sourcesUi),
-  );
+  check("results have an empty state", /No results yet/.test(resultsUi));
+  check("sources have an empty state", /Nothing retrieved yet/.test(sourcesUi));
   check(
     "evidence has an empty state",
     /No evidence extracted yet/.test(evidenceUi),
@@ -821,10 +836,7 @@ function main(): void {
     "the brief reflows instead of scrolling sideways",
     !/<table/.test(detailPage) && /<dl/.test(detailPage),
   );
-  check(
-    "the pipeline uses no fixed-width table",
-    !/<table/.test(pipeline),
-  );
+  check("the pipeline uses no fixed-width table", !/<table/.test(pipeline));
 
   // -------------------------------------------------------------------------
   console.log(results.join("\n"));

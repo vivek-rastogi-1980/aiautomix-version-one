@@ -196,6 +196,55 @@ async function getStageAttempts(runId: string): Promise<StageAttempt[]> {
     }));
 }
 
+// ---------------------------------------------------------------------------
+// Report version history
+// ---------------------------------------------------------------------------
+
+export interface ReportVersionEntry {
+  version: number;
+  createdAt: string;
+  status: string;
+  confidence: string;
+  isCurrent: boolean;
+}
+
+/**
+ * Every stored version of a section, newest first.
+ *
+ * `research_complete_stage` stands the previous row down and inserts
+ * `version = max + 1` — it never updates in place and never deletes. So this
+ * query is the whole history, and a regeneration adds to it rather than
+ * replacing anything.
+ *
+ * Keyed on `executive_summary` by default because the report stage rewrites
+ * that section on every regeneration, which makes its version the report's
+ * version.
+ */
+export async function getReportVersions(
+  workspaceId: string,
+  requestId: string,
+  sectionKey = "executive_summary",
+  limit = 20,
+): Promise<ReportVersionEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("research_results")
+    .select("version, created_at, status, confidence, is_current")
+    .eq("research_request_id", requestId)
+    .eq("workspace_id", workspaceId)
+    .eq("section_key", sectionKey)
+    .order("version", { ascending: false })
+    .limit(limit);
+
+  return (data ?? []).map((row) => ({
+    version: row.version,
+    createdAt: row.created_at,
+    status: row.status,
+    confidence: row.confidence,
+    isCurrent: row.is_current,
+  }));
+}
+
 /** Current version of every section that has been written. */
 export async function getResearchResults(
   requestId: string,
