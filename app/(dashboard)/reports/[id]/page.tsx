@@ -8,6 +8,7 @@ import { getReport } from "@/features/reports/data";
 import { buildBusinessValidatorReportModel } from "@/features/reports/report-definition";
 import { ReportRenderer } from "@/features/ai/renderer/report-renderer";
 import { DownloadPdfButton } from "@/features/ai/pdf/download-pdf-button";
+import { StartResearchLink } from "@/features/research/start-research-link";
 import { FormAlert } from "@/components/ui/form-message";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 
@@ -52,11 +53,16 @@ export default async function ReportPage({ params }: PageProps) {
             tokens: record.tokens_used,
           })}
           actions={
-            <DownloadPdfButton
-              href={`/api/reports/${record.id}/pdf`}
-              title={title}
-              suffix="aiautomix-report"
-            />
+            <>
+              {/* The validated idea is the natural starting point for market
+                  research, so the handoff lives where the verdict is read. */}
+              {idea ? <StartResearchLink ideaId={idea.id} /> : null}
+              <DownloadPdfButton
+                href={`/api/reports/${record.id}/pdf`}
+                title={title}
+                suffix="aiautomix-report"
+              />
+            </>
           }
         />
       ) : (

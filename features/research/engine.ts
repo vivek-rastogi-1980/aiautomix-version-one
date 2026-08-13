@@ -13,6 +13,10 @@ import {
   type ResearchStage,
 } from "@/features/research/types";
 import { stageCost, chargeKey, refundKey } from "@/features/research/cost";
+import {
+  RESEARCH_MAX_STAGE_ATTEMPTS,
+  RESEARCH_STAGE_LOCK_TIMEOUT_MS,
+} from "@/features/research/constants";
 import { RESEARCH_WORKFLOW_IDS } from "@/features/research/stages/workflows";
 import {
   buildStageInput,
@@ -34,11 +38,15 @@ import {
  * and pay seven credits for a report with no evidence behind it.
  */
 
-/** Central retry policy. Mirrors `p_max_attempts` in `research_claim_stage`. */
-export const RESEARCH_MAX_STAGE_ATTEMPTS = 3;
-
-/** A stage held longer than this is treated as abandoned and reclaimable. */
-export const RESEARCH_STAGE_LOCK_TIMEOUT_MS = 300_000;
+/**
+ * Central retry policy, now in `features/research/constants.ts` so the Phase 4
+ * pipeline UI can read the same number without importing this `server-only`
+ * module. Re-exported here because the engine is where callers expect it.
+ */
+export {
+  RESEARCH_MAX_STAGE_ATTEMPTS,
+  RESEARCH_STAGE_LOCK_TIMEOUT_MS,
+} from "@/features/research/constants";
 
 export interface StageExecutionResult {
   runId: string;

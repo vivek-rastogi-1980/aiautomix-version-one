@@ -760,6 +760,36 @@ export type ResearchResultRow = {
   updated_at: string;
 };
 
+/**
+ * A request joined to its most recent run (migration 0011).
+ *
+ * Every run column is nullable because a `draft` request has no run yet — the
+ * run is created by the first `run-stage` call, not by creating the brief.
+ */
+export type ResearchRequestOverviewRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_idea_id: string | null;
+  business_plan_id: string | null;
+  title: string;
+  industry: string | null;
+  geography: string | null;
+  depth: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  run_id: string | null;
+  run_status: string | null;
+  current_stage: string | null;
+  credits_charged: number | null;
+  credits_refunded: number | null;
+  source_count: number | null;
+  evidence_count: number | null;
+  run_error: string | null;
+  run_completed_at: string | null;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -995,7 +1025,12 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: Record<never, never>;
+    Views: {
+      research_request_overview: {
+        Row: ResearchRequestOverviewRow;
+        Relationships: [];
+      };
+    };
     Functions: {
       /** Migration 0007 — the only supported way to change a credit balance. */
       apply_credit_transaction: {
@@ -1142,6 +1177,30 @@ export interface Database {
       };
       /** Creates or reuses the single active run for a request. */
       research_start_run: { Args: { p_request_id: string }; Returns: string };
+
+      // --- Migration 0011: research product layer -----------------------
+      /**
+       * Creates a research brief. Re-derives workspace edit permission from
+       * `auth.uid()`, so `p_workspace_id` is a claim that gets checked rather
+       * than a grant, and refuses a business idea or plan from another
+       * workspace.
+       */
+      research_create_request: {
+        Args: {
+          p_workspace_id: string;
+          p_title: string;
+          p_depth: string;
+          p_scope?: string | null;
+          p_industry?: string | null;
+          p_geography?: string | null;
+          p_target_customer?: string | null;
+          p_business_model?: string | null;
+          p_questions?: unknown;
+          p_business_idea_id?: string | null;
+          p_business_plan_id?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;

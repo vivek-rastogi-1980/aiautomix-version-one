@@ -337,8 +337,18 @@ async function main(): Promise<void> {
       engineSource.indexOf("refundCredits"),
   );
   check(
+    // Phase 4 hoisted this into `features/research/constants.ts` so the
+    // pipeline UI reads the same number the engine enforces. Still one
+    // definition — just one the client can import too.
     "the retry limit is centrally defined",
-    /RESEARCH_MAX_STAGE_ATTEMPTS = 3/.test(engineSourceFull),
+    /RESEARCH_MAX_STAGE_ATTEMPTS = 3/.test(
+      readFileSync(
+        path.join(process.cwd(), "features/research/constants.ts"),
+        "utf8",
+      ),
+    ) &&
+      /RESEARCH_MAX_STAGE_ATTEMPTS/.test(engineSourceFull) &&
+      !/RESEARCH_MAX_STAGE_ATTEMPTS\s*=\s*\d/.test(engineSourceFull),
   );
   check(
     "stage cost comes from central configuration",

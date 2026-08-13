@@ -11,6 +11,7 @@ import { SectionNav } from "@/features/ai/renderer/blocks/section-nav";
 import { getBusinessPlan } from "@/features/business-plans/data";
 import { getPlanSection } from "@/features/business-plans/sections";
 import { SectionEditor } from "@/features/business-plans/section-editor";
+import { StartResearchLink } from "@/features/research/start-research-link";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -62,13 +63,16 @@ export default async function PlanPage({ params }: PageProps) {
             ) : null}
           </div>
 
-          {sections.length > 0 ? (
-            <DownloadPdfButton
-              href={`/api/business-plans/${plan.id}/pdf`}
-              title={plan.title}
-              suffix="aiautomix-business-plan"
-            />
-          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <StartResearchLink planId={plan.id} />
+            {sections.length > 0 ? (
+              <DownloadPdfButton
+                href={`/api/business-plans/${plan.id}/pdf`}
+                title={plan.title}
+                suffix="aiautomix-business-plan"
+              />
+            ) : null}
+          </div>
         </div>
       </Card>
 
