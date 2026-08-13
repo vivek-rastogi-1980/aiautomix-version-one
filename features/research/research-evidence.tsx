@@ -87,7 +87,10 @@ export function ResearchEvidence({ page }: ResearchEvidenceProps) {
               role="status"
               className="flex items-start gap-2 rounded-xl border border-accent-lime/30 bg-accent-lime/10 px-4 py-3 text-sm text-accent-lime"
             >
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <AlertTriangle
+                className="mt-0.5 size-4 shrink-0"
+                aria-hidden="true"
+              />
               <span>
                 {lowConfidence} of the claims shown are low confidence. Treat
                 them as leads to verify, not as findings.

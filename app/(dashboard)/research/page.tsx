@@ -18,8 +18,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Market research",
-  description:
-    "Evidence-backed market research projects in your workspace.",
+  description: "Evidence-backed market research projects in your workspace.",
 };
 
 /**
@@ -105,7 +104,10 @@ function Header({
         </p>
       </div>
       {canCreate ? (
-        <Link href="/research/new" className={cn(buttonVariants({ size: "md" }))}>
+        <Link
+          href="/research/new"
+          className={cn(buttonVariants({ size: "md" }))}
+        >
           <Microscope className="size-4" /> New research
         </Link>
       ) : null}
@@ -118,13 +120,18 @@ function cardStatus(
   status: string,
   runStatus: string | null,
   completedStages: number,
-): { label: string; variant: "active" | "completed" | "archived" | "neutral" | "paused" } {
+): {
+  label: string;
+  variant: "active" | "completed" | "archived" | "neutral" | "paused";
+} {
   if (status === "completed") return { label: "Completed", variant: "active" };
   if (status === "failed" || runStatus === "failed") {
     return { label: "Failed", variant: "archived" };
   }
-  if (status === "cancelled") return { label: "Cancelled", variant: "archived" };
-  if (runStatus === "running") return { label: "Running", variant: "completed" };
+  if (status === "cancelled")
+    return { label: "Cancelled", variant: "archived" };
+  if (runStatus === "running")
+    return { label: "Running", variant: "completed" };
   if (completedStages > 0) return { label: "Incomplete", variant: "paused" };
   return { label: "Draft", variant: "neutral" };
 }
@@ -190,9 +197,7 @@ function ResearchCard({
           <p className="mt-2 text-xs text-muted-strong">
             Created {formatDate(project.created_at)} · Updated{" "}
             {formatDate(project.updated_at)}
-            {project.source_count
-              ? ` · ${project.source_count} sources`
-              : ""}
+            {project.source_count ? ` · ${project.source_count} sources` : ""}
           </p>
         </div>
 

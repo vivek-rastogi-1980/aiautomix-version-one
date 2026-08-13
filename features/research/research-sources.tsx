@@ -153,12 +153,16 @@ function SourceRow({ source }: { source: ResearchSourceRow }) {
               <div className="flex gap-1.5">
                 <dt>Published</dt>
                 <dd className="text-muted">
-                  {source.published_at ? formatDate(source.published_at) : "Not stated"}
+                  {source.published_at
+                    ? formatDate(source.published_at)
+                    : "Not stated"}
                 </dd>
               </div>
               <div className="flex gap-1.5">
                 <dt>Retrieved</dt>
-                <dd className="text-muted">{formatDate(source.retrieved_at)}</dd>
+                <dd className="text-muted">
+                  {formatDate(source.retrieved_at)}
+                </dd>
               </div>
             </dl>
           </div>

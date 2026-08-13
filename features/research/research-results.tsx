@@ -151,7 +151,10 @@ function SectionCard({
 
         {insufficient ? (
           <p className="mt-4 flex items-start gap-2 rounded-xl border border-accent-lime/30 bg-accent-lime/10 px-4 py-3 text-sm text-accent-lime">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
             <span>
               The sources found did not support this section. Treat anything
               below as unverified, and widen the research scope if you need it.

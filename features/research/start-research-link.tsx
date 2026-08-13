@@ -26,7 +26,11 @@ export function StartResearchLink({
   planId?: string;
   className?: string;
 }) {
-  const query = ideaId ? `?ideaId=${ideaId}` : planId ? `?planId=${planId}` : "";
+  const query = ideaId
+    ? `?ideaId=${ideaId}`
+    : planId
+      ? `?planId=${planId}`
+      : "";
 
   return (
     <Link

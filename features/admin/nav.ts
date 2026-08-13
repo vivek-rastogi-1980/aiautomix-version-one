@@ -51,11 +51,27 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     description: "Requests, failures, models and tokens.",
   },
   {
+    href: "/admin/research",
+    label: "Research ops",
+    // The same grant that governs the research tables' admin SELECT policies in
+    // migration 0009 — a role that can read the rows can read the monitoring.
+    permission: "ai.read",
+    icon: "Microscope",
+    description: "Runs, stages, failures and evidence counts.",
+  },
+  {
     href: "/admin/usage",
     label: "Usage",
     permission: "usage.read",
     icon: "Activity",
     description: "Consumption across the platform.",
+  },
+  {
+    href: "/admin/costs",
+    label: "Cost analytics",
+    permission: "usage.read",
+    icon: "DollarSign",
+    description: "Spend by day, provider, model, workflow and workspace.",
   },
   {
     href: "/admin/credits",

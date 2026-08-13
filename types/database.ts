@@ -1117,6 +1117,41 @@ export interface Database {
         Returns: Record<string, number | string>;
       };
 
+      // --- Migration 0013: admin operations -----------------------------
+      /** Research/product counters for the admin dashboard, permission-gated. */
+      admin_research_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+      /**
+       * AI cost and usage aggregated in SQL. `p_dimension` is validated against
+       * a fixed list inside the function — it is never interpolated into a
+       * query, so an unexpected value errors rather than reshaping the SQL.
+       */
+      admin_cost_breakdown: {
+        Args: {
+          p_dimension:
+            "day" | "provider" | "model" | "workflow" | "feature" | "workspace";
+          p_since?: string | null;
+          p_until?: string | null;
+          p_limit?: number;
+        };
+        Returns: {
+          dimension: string;
+          since: string;
+          until: string;
+          rows: {
+            key: string;
+            label: string;
+            requests: number;
+            failures: number;
+            tokens: number;
+            /** `numeric` as text — never a JS float for a money column. */
+            cost: string;
+          }[];
+        };
+      };
+
       // --- Migration 0009: market research ------------------------------
       /** Total credits for a full run at this depth, summed from the same
        *  rows the stage engine charges against. */
@@ -1177,6 +1212,23 @@ export interface Database {
       };
       /** Creates or reuses the single active run for a request. */
       research_start_run: { Args: { p_request_id: string }; Returns: string };
+
+      // --- Migration 0012: report regeneration --------------------------
+      /**
+       * Claims a re-run of the `report` stage only, on a run whose report has
+       * already succeeded. Never re-runs retrieval, so regenerating a report
+       * costs one stage instead of seven and returns the same sources.
+       */
+      research_claim_report_regeneration: {
+        Args: { p_request_id: string; p_lock_timeout_ms?: number };
+        Returns: {
+          run_id: string;
+          attempt: number;
+          depth: string;
+          workspace_id: string;
+          request_id: string;
+        }[];
+      };
 
       // --- Migration 0011: research product layer -----------------------
       /**

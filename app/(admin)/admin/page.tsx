@@ -8,6 +8,7 @@ import {
   recentWorkspaces,
   recentCreditActivity,
 } from "@/features/admin/data";
+import { getResearchStats } from "@/features/admin/research-ops";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
 import { Card } from "@/components/ui/card";
@@ -33,8 +34,12 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const { has, role } = await requireAdmin();
 
-  const [stats, failures, workspaces, credits] = await Promise.all([
+  const [stats, research, failures, workspaces, credits] = await Promise.all([
     getPlatformStats(),
+    // A second, additive RPC rather than a redefinition of the first: Phase 6
+    // adds the product counters without changing what an already-deployed
+    // `admin_platform_stats` returns.
+    getResearchStats(),
     has("ai.read") ? recentFailures(6) : Promise.resolve([]),
     has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
     has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
@@ -43,6 +48,11 @@ export default async function AdminDashboard() {
   /** A stat is `null` (→ "Unavailable") when the RPC omitted the key. */
   const num = (key: string): number | null => {
     const value = stats?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const researchNum = (key: string): number | null => {
+    const value = research?.[key];
     return typeof value === "number" ? value : null;
   };
 
@@ -152,6 +162,54 @@ export default async function AdminDashboard() {
           last-seen data, so the metric cannot be measured without inventing a
           definition. Sprint 8 candidate.
         </p>
+      </section>
+
+      {/* --- Product output ------------------------------------------------
+          What the platform actually produced in the period. Counted by
+          `admin_research_stats` in SQL and gated per block there, so a role
+          without `ai.read` sees Unavailable rather than zero. */}
+      <section aria-label="Product output" className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+            Product output
+          </h2>
+          {has("ai.read") ? (
+            <Link
+              href="/admin/research"
+              className="text-sm text-accent hover:underline"
+            >
+              Research operations →
+            </Link>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Research runs"
+            value={researchNum("research_runs")}
+            sub={
+              researchNum("research_completed") !== null
+                ? `${researchNum("research_completed")} completed`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Failed stage attempts"
+            value={researchNum("stage_failures")}
+            sub="Refunded automatically"
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Validator runs"
+            value={researchNum("validator_runs")}
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Business plans"
+            value={researchNum("business_plans")}
+            unavailableNote="Requires ai.read"
+          />
+        </div>
       </section>
 
       {/* --- Recent failures ---------------------------------------------- */}

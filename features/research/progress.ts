@@ -141,7 +141,10 @@ export function buildRunProgress({
  * Derived from the same rows as the pipeline, so the summary and the stage list
  * can never tell different stories.
  */
-export function statusLabel(progress: RunProgress, requestStatus: string): {
+export function statusLabel(
+  progress: RunProgress,
+  requestStatus: string,
+): {
   label: string;
   variant: "active" | "completed" | "archived" | "neutral" | "paused";
 } {

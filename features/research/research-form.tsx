@@ -360,8 +360,8 @@ export function ResearchForm({
               Estimated usage:
             </strong>{" "}
             about {selected.estimatedCredits} credits for all seven stages at{" "}
-            {selected.label} depth. Credits are charged per stage as it runs, and
-            a failed stage is refunded — so you only pay for what completes.
+            {selected.label} depth. Credits are charged per stage as it runs,
+            and a failed stage is refunded — so you only pay for what completes.
           </p>
         ) : null}
       </Card>
