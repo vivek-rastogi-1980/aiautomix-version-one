@@ -14,6 +14,7 @@ import {
   toPlanPromptVariables,
 } from "@/lib/validations/business-plan";
 import { RESEARCH_WORKFLOWS } from "@/features/research/stages/workflows";
+import { COMPETITOR_WORKFLOWS } from "@/features/competitors/stages/workflows";
 
 /**
  * Workflow Registry (AI-PLATFORM-SPEC.md, WORKFLOW-MANAGER-SPEC.md).
@@ -58,6 +59,11 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
   // AI product, so the stage engine gets validation, retries, usage logging and
   // cost estimation from the platform rather than reimplementing them.
   ...RESEARCH_WORKFLOWS,
+
+  // Phase 7: the seven Competitor Intelligence stages, on the same terms.
+  // Three of them declare `capability: "research"` and reach the web through
+  // `AiProvider.research()`; the other four reason over stored rows.
+  ...COMPETITOR_WORKFLOWS,
 };
 
 /**
