@@ -760,6 +760,165 @@ export type ResearchResultRow = {
   updated_at: string;
 };
 
+// ---------------------------------------------------------------------------
+// Competitor Intelligence (migration 0014)
+// ---------------------------------------------------------------------------
+
+export type CompetitorDepthRow = {
+  id: string;
+  label: string;
+  description: string;
+  max_competitors: number;
+  max_sources: number;
+  max_queries: number;
+  stage_timeout_ms: number;
+  max_attempts: number;
+  sort_order: number;
+  is_active: boolean;
+};
+
+export type CompetitorStageCostRow = {
+  depth: string;
+  stage: string;
+  credits: number;
+};
+
+export type CompetitorProjectRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_idea_id: string | null;
+  business_plan_id: string | null;
+  title: string;
+  description: string | null;
+  category: string | null;
+  geography: string | null;
+  target_customer: string | null;
+  customer_problem: string | null;
+  business_model: string | null;
+  known_competitors: unknown;
+  depth: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CompetitorRunRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  status: string;
+  /** The resume point. Null once the run finishes. */
+  current_stage: string | null;
+  depth: string;
+  credits_charged: number;
+  credits_refunded: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  competitor_count: number;
+  verified_count: number;
+  source_count: number;
+  evidence_count: number;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CompetitorRunStageRow = {
+  id: string;
+  run_id: string;
+  workspace_id: string;
+  stage: string;
+  /** A retry is a new attempt with its own charge. */
+  attempt: number;
+  status: string;
+  ai_usage_log_id: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  prompt_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  duration_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type CompetitorSourceRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  url: string;
+  canonical_url: string;
+  title: string | null;
+  publisher: string | null;
+  source_type: string;
+  /** Nullable: a missing publication date is recorded, never invented. */
+  published_at: string | null;
+  retrieved_at: string;
+  status: string;
+  /** Retrieval metadata only — never raw page content. */
+  metadata: unknown;
+  created_at: string;
+};
+
+export type CompetitorRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  name: string;
+  website: string | null;
+  canonical_domain: string;
+  competitor_type: string;
+  verification_status: string;
+  verification_notes: string | null;
+  /** Stage-written structured data, validated by Zod before it lands. */
+  profile: unknown;
+  pricing: unknown;
+  positioning: unknown;
+  confidence: string;
+  relevance: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CompetitorEvidenceRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  /** NOT NULL by design: a claim with no source row cannot be stored. */
+  source_id: string;
+  /** Null for project-level claims such as a market gap. */
+  competitor_id: string | null;
+  section_key: string;
+  claim: string;
+  evidence_reference: string | null;
+  /** STATED / OBSERVED / INFERRED / RECOMMENDED. */
+  claim_kind: string;
+  confidence: string;
+  is_contradictory: boolean;
+  created_at: string;
+};
+
+export type CompetitorResultRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  section_key: string;
+  structured_content: unknown;
+  confidence: string;
+  status: string;
+  version: number;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 /**
  * A request joined to its most recent run (migration 0011).
  *
@@ -1024,6 +1183,88 @@ export interface Database {
         Update: Partial<ResearchResultRow>;
         Relationships: [];
       };
+
+      // --- Migration 0014: competitor intelligence ----------------------
+      // No client write path exists for any of these; `Insert`/`Update` are
+      // declared for type completeness, and every write goes through a
+      // security-definer function.
+      competitor_depths: {
+        Row: CompetitorDepthRow;
+        Insert: CompetitorDepthRow;
+        Update: Partial<CompetitorDepthRow>;
+        Relationships: [];
+      };
+      competitor_stage_costs: {
+        Row: CompetitorStageCostRow;
+        Insert: CompetitorStageCostRow;
+        Update: Partial<CompetitorStageCostRow>;
+        Relationships: [];
+      };
+      competitor_projects: {
+        Row: CompetitorProjectRow;
+        Insert: Omit<
+          CompetitorProjectRow,
+          "id" | "created_at" | "updated_at"
+        > & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<CompetitorProjectRow>;
+        Relationships: [];
+      };
+      competitor_runs: {
+        Row: CompetitorRunRow;
+        Insert: Omit<CompetitorRunRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<CompetitorRunRow>;
+        Relationships: [];
+      };
+      competitor_run_stages: {
+        Row: CompetitorRunStageRow;
+        Insert: Omit<CompetitorRunStageRow, "id" | "started_at"> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<CompetitorRunStageRow>;
+        Relationships: [];
+      };
+      competitor_sources: {
+        Row: CompetitorSourceRow;
+        Insert: Omit<
+          CompetitorSourceRow,
+          "id" | "created_at" | "retrieved_at"
+        > & { id?: string; created_at?: string; retrieved_at?: string };
+        Update: Partial<CompetitorSourceRow>;
+        Relationships: [];
+      };
+      competitors: {
+        Row: CompetitorRow;
+        Insert: Omit<CompetitorRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<CompetitorRow>;
+        Relationships: [];
+      };
+      competitor_evidence: {
+        Row: CompetitorEvidenceRow;
+        Insert: Omit<CompetitorEvidenceRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<CompetitorEvidenceRow>;
+        Relationships: [];
+      };
+      competitor_results: {
+        Row: CompetitorResultRow;
+        Insert: Omit<
+          CompetitorResultRow,
+          "id" | "created_at" | "updated_at"
+        > & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<CompetitorResultRow>;
+        Relationships: [];
+      };
     };
     Views: {
       research_request_overview: {
@@ -1115,6 +1356,91 @@ export interface Database {
       admin_platform_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;
+      };
+
+      // --- Migration 0014: competitor intelligence ----------------------
+      /** Total credits for a full competitor run at this depth. */
+      competitor_estimate_credits: {
+        Args: { p_depth: string };
+        Returns: number;
+      };
+      /**
+       * Creates a competitor brief. Re-derives workspace edit permission from
+       * `auth.uid()` and refuses an idea or plan from another workspace.
+       */
+      competitor_create_project: {
+        Args: {
+          p_workspace_id: string;
+          p_title: string;
+          p_depth: string;
+          p_description?: string | null;
+          p_category?: string | null;
+          p_geography?: string | null;
+          p_target_customer?: string | null;
+          p_customer_problem?: string | null;
+          p_business_model?: string | null;
+          p_known_competitors?: unknown;
+          p_business_idea_id?: string | null;
+          p_business_plan_id?: string | null;
+        };
+        Returns: string;
+      };
+      /** Creates or reuses the single active run for a project. */
+      competitor_start_run: { Args: { p_project_id: string }; Returns: string };
+      /**
+       * Atomically claims the next executable stage. The row lock inside is
+       * what stops two concurrent requests running — and charging for — the
+       * same stage.
+       */
+      competitor_claim_stage: {
+        Args: {
+          p_run_id: string;
+          p_max_attempts?: number;
+          p_lock_timeout_ms?: number;
+        };
+        Returns: {
+          stage: string;
+          attempt: number;
+          depth: string;
+          workspace_id: string;
+          project_id: string;
+        }[];
+      };
+      /**
+       * Persists sources, competitors, evidence and section results AND
+       * advances the pointer, in one transaction.
+       */
+      competitor_complete_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_next_stage: string | null;
+          p_results?: unknown;
+          p_sources?: unknown;
+          p_competitors?: unknown;
+          p_evidence?: unknown;
+          p_usage?: unknown;
+        };
+        Returns: {
+          sources_added: number;
+          competitors_written: number;
+          evidence_added: number;
+          next_stage: string | null;
+        };
+      };
+      /** Records a failure and releases the lock WITHOUT advancing. */
+      competitor_fail_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_error_code: string;
+          p_error_message: string;
+          p_terminal?: boolean;
+          p_usage?: unknown;
+        };
+        Returns: undefined;
       };
 
       // --- Migration 0013: admin operations -----------------------------
