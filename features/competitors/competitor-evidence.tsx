@@ -10,10 +10,7 @@ import {
   isCompetitorReportSection,
   type ClaimKind,
 } from "@/features/competitors/types";
-import type {
-  EvidenceWithSource,
-  Page,
-} from "@/features/competitors/data";
+import type { EvidenceWithSource, Page } from "@/features/competitors/data";
 import type { CompetitorSourceRow } from "@/types/database";
 
 /**

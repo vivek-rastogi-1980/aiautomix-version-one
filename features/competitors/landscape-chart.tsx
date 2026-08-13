@@ -30,7 +30,10 @@ interface LandscapePoint {
 }
 
 function num(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100
     ? value
     : null;
 }
@@ -48,15 +51,15 @@ export function LandscapeChart({
   available: boolean;
   competitors: CompetitorRow[];
 }) {
-  const points = (Array.isArray(landscape) ? (landscape as LandscapePoint[]) : [])
+  const points = (
+    Array.isArray(landscape) ? (landscape as LandscapePoint[]) : []
+  )
     .map((point) => {
       const domain = str(point?.domain);
       const price = num(point?.priceLevel);
       const breadth = num(point?.featureBreadth);
       if (!domain || price === null || breadth === null) return null;
-      const competitor = competitors.find(
-        (c) => c.canonical_domain === domain,
-      );
+      const competitor = competitors.find((c) => c.canonical_domain === domain);
       return {
         domain,
         name: competitor?.name ?? domain,

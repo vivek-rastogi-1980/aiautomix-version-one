@@ -355,3 +355,21 @@ export async function getResearchStats(
   if (error) return null;
   return (data as Record<string, number | string>) ?? null;
 }
+
+/**
+ * Competitor Intelligence counters.
+ *
+ * A separate RPC from `admin_research_stats` rather than an extension of it,
+ * so an already-deployed aggregate keeps returning exactly what it returned
+ * before. The dashboard merges the payloads.
+ */
+export async function getCompetitorStats(
+  since?: Date,
+): Promise<Record<string, number | string> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_competitor_stats", {
+    p_since: since ? since.toISOString() : null,
+  });
+  if (error) return null;
+  return (data as Record<string, number | string>) ?? null;
+}

@@ -139,7 +139,10 @@ export function ComparisonMatrix({
             </thead>
             <tbody>
               {rows.map(({ dimension, row }) => (
-                <tr key={dimension} className="border-b border-line last:border-0">
+                <tr
+                  key={dimension}
+                  className="border-b border-line last:border-0"
+                >
                   <th
                     scope="row"
                     className="px-4 py-3 text-left align-top text-sm font-medium text-foreground"
@@ -201,11 +204,7 @@ export function ComparisonMatrix({
                   {ownBusinessLabel}
                 </dt>
                 <dd className="mt-0.5 text-sm">
-                  <CellValue
-                    value={str(row.ownBusiness)}
-                    kind="INFERRED"
-                    own
-                  />
+                  <CellValue value={str(row.ownBusiness)} kind="INFERRED" own />
                 </dd>
               </div>
             </dl>

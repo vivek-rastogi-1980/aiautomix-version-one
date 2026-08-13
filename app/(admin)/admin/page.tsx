@@ -8,7 +8,10 @@ import {
   recentWorkspaces,
   recentCreditActivity,
 } from "@/features/admin/data";
-import { getResearchStats } from "@/features/admin/research-ops";
+import {
+  getResearchStats,
+  getCompetitorStats,
+} from "@/features/admin/research-ops";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
 import { Card } from "@/components/ui/card";
@@ -34,16 +37,18 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const { has, role } = await requireAdmin();
 
-  const [stats, research, failures, workspaces, credits] = await Promise.all([
-    getPlatformStats(),
-    // A second, additive RPC rather than a redefinition of the first: Phase 6
-    // adds the product counters without changing what an already-deployed
-    // `admin_platform_stats` returns.
-    getResearchStats(),
-    has("ai.read") ? recentFailures(6) : Promise.resolve([]),
-    has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
-    has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
-  ]);
+  const [stats, research, competitors, failures, workspaces, credits] =
+    await Promise.all([
+      getPlatformStats(),
+      // Additive RPCs rather than redefinitions: each phase adds its own
+      // counters without changing what an already-deployed
+      // `admin_platform_stats` returns.
+      getResearchStats(),
+      getCompetitorStats(),
+      has("ai.read") ? recentFailures(6) : Promise.resolve([]),
+      has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
+      has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
+    ]);
 
   /** A stat is `null` (→ "Unavailable") when the RPC omitted the key. */
   const num = (key: string): number | null => {
@@ -53,6 +58,11 @@ export default async function AdminDashboard() {
 
   const researchNum = (key: string): number | null => {
     const value = research?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const competitorNum = (key: string): number | null => {
+    const value = competitors?.[key];
     return typeof value === "number" ? value : null;
   };
 
@@ -207,6 +217,26 @@ export default async function AdminDashboard() {
           <Stat
             label="Business plans"
             value={researchNum("business_plans")}
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Competitor runs"
+            value={competitorNum("competitor_runs")}
+            sub={
+              competitorNum("competitor_completed") !== null
+                ? `${competitorNum("competitor_completed")} completed`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Competitors found"
+            value={competitorNum("competitors_found")}
+            sub={
+              competitorNum("competitors_verified") !== null
+                ? `${competitorNum("competitors_verified")} verified`
+                : undefined
+            }
             unavailableNote="Requires ai.read"
           />
         </div>
