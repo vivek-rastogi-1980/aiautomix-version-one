@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Calculator,
   Building2,
   CreditCard,
   Stethoscope,
@@ -33,6 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/plans", label: "Business Plans", icon: NotebookPen },
   { href: "/research", label: "Market Research", icon: Microscope },
   { href: "/competitors", label: "Competitors", icon: Swords },
+  { href: "/financials", label: "Financials", icon: Calculator },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/ai/history", label: "AI activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },

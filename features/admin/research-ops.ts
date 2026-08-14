@@ -373,3 +373,22 @@ export async function getCompetitorStats(
   if (error) return null;
   return (data as Record<string, number | string>) ?? null;
 }
+
+/**
+ * Financial Intelligence counters.
+ *
+ * Same shape and the same reasoning as the competitor aggregate: a third RPC
+ * rather than a wider one, counted in SQL rather than by paging rows into
+ * JavaScript and summing them, and permission-gated inside the function so an
+ * absent key is an authorisation answer rather than a zero.
+ */
+export async function getFinancialStats(
+  since?: Date,
+): Promise<Record<string, number | string> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_financial_stats", {
+    p_since: since ? since.toISOString() : null,
+  });
+  if (error) return null;
+  return (data as Record<string, number | string>) ?? null;
+}

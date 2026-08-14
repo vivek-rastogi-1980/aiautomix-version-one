@@ -21,9 +21,10 @@
     "test:research-product": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/research-product-smoke.tsx",
     "test:research-report": "tsx --tsconfig scripts/tsconfig.json scripts/research-report-smoke.tsx",
     "test:competitors": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/competitor-smoke.tsx",
+    "test:financials": "tsx --conditions=react-server --tsconfig scripts/tsconfig.json scripts/financial-smoke.tsx",
     "test:provider-research": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/provider-research-smoke.tsx",
     "test:research-stage": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/research-stage-smoke.tsx",
-    "test": "npm run test:engine && npm run test:report && npm run test:plan && npm run test:pdf && npm run test:security && npm run test:commerce && npm run test:admin && npm run test:admin-ops && npm run test:research && npm run test:research-product && npm run test:research-report && npm run test:competitors && npm run test:provider-research && npm run test:research-stage",
+    "test": "npm run test:engine && npm run test:report && npm run test:plan && npm run test:pdf && npm run test:security && npm run test:commerce && npm run test:admin && npm run test:admin-ops && npm run test:research && npm run test:research-product && npm run test:research-report && npm run test:competitors && npm run test:financials && npm run test:provider-research && npm run test:research-stage",
     "verify:research": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/research-live-check.tsx",
     "typecheck": "tsc --noEmit",
     "sync:workflows": "tsx --env-file-if-exists=.env.local --conditions=react-server --tsconfig scripts/tsconfig.json scripts/sync-workflows.ts"

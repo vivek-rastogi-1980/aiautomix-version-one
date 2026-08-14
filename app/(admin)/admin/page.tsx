@@ -11,6 +11,7 @@ import {
 import {
   getResearchStats,
   getCompetitorStats,
+  getFinancialStats,
 } from "@/features/admin/research-ops";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
@@ -37,18 +38,26 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const { has, role } = await requireAdmin();
 
-  const [stats, research, competitors, failures, workspaces, credits] =
-    await Promise.all([
-      getPlatformStats(),
-      // Additive RPCs rather than redefinitions: each phase adds its own
-      // counters without changing what an already-deployed
-      // `admin_platform_stats` returns.
-      getResearchStats(),
-      getCompetitorStats(),
-      has("ai.read") ? recentFailures(6) : Promise.resolve([]),
-      has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
-      has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
-    ]);
+  const [
+    stats,
+    research,
+    competitors,
+    financials,
+    failures,
+    workspaces,
+    credits,
+  ] = await Promise.all([
+    getPlatformStats(),
+    // Additive RPCs rather than redefinitions: each phase adds its own
+    // counters without changing what an already-deployed
+    // `admin_platform_stats` returns.
+    getResearchStats(),
+    getCompetitorStats(),
+    getFinancialStats(),
+    has("ai.read") ? recentFailures(6) : Promise.resolve([]),
+    has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
+    has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
+  ]);
 
   /** A stat is `null` (→ "Unavailable") when the RPC omitted the key. */
   const num = (key: string): number | null => {
@@ -63,6 +72,11 @@ export default async function AdminDashboard() {
 
   const competitorNum = (key: string): number | null => {
     const value = competitors?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const financialNum = (key: string): number | null => {
+    const value = financials?.[key];
     return typeof value === "number" ? value : null;
   };
 
@@ -237,6 +251,22 @@ export default async function AdminDashboard() {
                 ? `${competitorNum("competitors_verified")} verified`
                 : undefined
             }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Financial models"
+            value={financialNum("financial_projects")}
+            sub={
+              financialNum("financial_runs") !== null
+                ? `${financialNum("financial_runs")} runs`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Funding options found"
+            value={financialNum("funding_options")}
+            sub="Citation-backed only"
             unavailableNote="Requires ai.read"
           />
         </div>
