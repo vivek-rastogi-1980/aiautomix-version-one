@@ -21,6 +21,9 @@ export const FEATURES = [
   "pdf_export",
   "market_research",
   "competitor_analysis",
+  // Phase 8. Seeded across all five plans by migration 0016 — without the
+  // seed `canAccess` finds no row and fails closed for every customer.
+  "financial_intelligence",
   "team_members",
   "api_access",
 ] as const;

@@ -949,6 +949,169 @@ export type ResearchRequestOverviewRow = {
   run_completed_at: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// Financial & Funding Intelligence (migration 0016)
+//
+// Every `*_minor` field is an INTEGER COUNT OF MINOR UNITS in the project's
+// currency — paise, cents, pence. Never a major-unit value, never a float.
+// ---------------------------------------------------------------------------
+
+export type FinancialStageCostRow = { stage: string; credits: number };
+
+export type FinancialProjectRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_idea_id: string | null;
+  business_plan_id: string | null;
+  research_request_id: string | null;
+  competitor_project_id: string | null;
+  title: string;
+  description: string | null;
+  industry: string | null;
+  geography: string | null;
+  target_customer: string | null;
+  /** ISO 4217. Required — a model whose currency was assumed means nothing. */
+  currency: string;
+  revenue_model: string;
+  horizon_months: number;
+  opening_cash_minor: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialRunRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  status: string;
+  /** The resume point. Null once the run finishes. */
+  current_stage: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  assumption_count: number;
+  cost_line_count: number;
+  funding_option_count: number;
+  source_count: number;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialRunStageRow = {
+  id: string;
+  run_id: string;
+  workspace_id: string;
+  stage: string;
+  attempt: number;
+  status: string;
+  ai_usage_log_id: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  prompt_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  duration_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type FinancialAssumptionRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  key: string;
+  label: string;
+  /** Determines which value column is authoritative. */
+  unit: string;
+  /** Money only, in minor units. */
+  value_minor: number | null;
+  /** Counts, basis points and month counts. */
+  value_int: number | null;
+  /** USER / AI / INHERITED_* / DEFAULT. Never null — provenance is required. */
+  source: string;
+  confidence: string;
+  rationale: string | null;
+  evidence_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialCostRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  category: string;
+  kind: string;
+  label: string;
+  amount_minor: number;
+  every_months: number;
+  source: string;
+  confidence: string;
+  rationale: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialSourceRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  url: string;
+  canonical_url: string;
+  title: string | null;
+  publisher: string | null;
+  published_at: string | null;
+  retrieved_at: string;
+  status: string;
+  metadata: unknown;
+  created_at: string;
+};
+
+export type FundingOptionRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  source_id: string | null;
+  name: string;
+  provider: string | null;
+  funding_type: string;
+  geography: string | null;
+  eligibility: string | null;
+  /** Published range only. Null means not published — never inferred. */
+  amount_min_minor: number | null;
+  amount_max_minor: number | null;
+  terms: string | null;
+  application_url: string | null;
+  suitability: string;
+  suitability_rationale: string | null;
+  confidence: string;
+  created_at: string;
+};
+
+export type FinancialResultRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  section_key: string;
+  structured_content: unknown;
+  confidence: string;
+  status: string;
+  version: number;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -1265,6 +1428,98 @@ export interface Database {
         Update: Partial<CompetitorResultRow>;
         Relationships: [];
       };
+      // --- Migration 0016: financial intelligence -----------------------
+      // No client write path exists for any of these; every write goes through
+      // a security-definer function.
+      financial_stage_costs: {
+        Row: FinancialStageCostRow;
+        Insert: FinancialStageCostRow;
+        Update: Partial<FinancialStageCostRow>;
+        Relationships: [];
+      };
+      financial_projects: {
+        Row: FinancialProjectRow;
+        Insert: Omit<
+          FinancialProjectRow,
+          "id" | "created_at" | "updated_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<FinancialProjectRow>;
+        Relationships: [];
+      };
+      financial_runs: {
+        Row: FinancialRunRow;
+        Insert: Omit<FinancialRunRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<FinancialRunRow>;
+        Relationships: [];
+      };
+      financial_run_stages: {
+        Row: FinancialRunStageRow;
+        Insert: Omit<FinancialRunStageRow, "id" | "started_at"> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<FinancialRunStageRow>;
+        Relationships: [];
+      };
+      financial_assumptions: {
+        Row: FinancialAssumptionRow;
+        Insert: Omit<
+          FinancialAssumptionRow,
+          "id" | "created_at" | "updated_at"
+        > & { id?: string; created_at?: string; updated_at?: string };
+        Update: Partial<FinancialAssumptionRow>;
+        Relationships: [];
+      };
+      financial_costs: {
+        Row: FinancialCostRow;
+        Insert: Omit<FinancialCostRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<FinancialCostRow>;
+        Relationships: [];
+      };
+      financial_sources: {
+        Row: FinancialSourceRow;
+        Insert: Omit<
+          FinancialSourceRow,
+          "id" | "created_at" | "retrieved_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          retrieved_at?: string;
+        };
+        Update: Partial<FinancialSourceRow>;
+        Relationships: [];
+      };
+      funding_options: {
+        Row: FundingOptionRow;
+        Insert: Omit<FundingOptionRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<FundingOptionRow>;
+        Relationships: [];
+      };
+      financial_results: {
+        Row: FinancialResultRow;
+        Insert: Omit<FinancialResultRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<FinancialResultRow>;
+        Relationships: [];
+      };
     };
     Views: {
       research_request_overview: {
@@ -1358,9 +1613,110 @@ export interface Database {
         Returns: Record<string, number | string>;
       };
 
+      // --- Migration 0016: financial intelligence -----------------------
+      /** Total credits for a full financial run. Compute stages contribute 0. */
+      financial_estimate_credits: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      /** Creates a financial model. Re-derives edit permission from auth.uid(). */
+      financial_create_project: {
+        Args: {
+          p_workspace_id: string;
+          p_title: string;
+          p_currency: string;
+          p_revenue_model: string;
+          p_description?: string | null;
+          p_industry?: string | null;
+          p_geography?: string | null;
+          p_target_customer?: string | null;
+          p_horizon_months?: number;
+          p_opening_cash_minor?: number;
+          p_business_idea_id?: string | null;
+          p_business_plan_id?: string | null;
+          p_research_request_id?: string | null;
+          p_competitor_project_id?: string | null;
+        };
+        Returns: string;
+      };
+      financial_start_run: { Args: { p_project_id: string }; Returns: string };
+      financial_claim_stage: {
+        Args: {
+          p_run_id: string;
+          p_max_attempts?: number;
+          p_lock_timeout_ms?: number;
+        };
+        Returns: {
+          stage: string;
+          attempt: number;
+          workspace_id: string;
+          project_id: string;
+        }[];
+      };
+      financial_complete_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_next_stage: string | null;
+          p_results?: unknown;
+          p_assumptions?: unknown;
+          p_costs?: unknown;
+          p_sources?: unknown;
+          p_funding?: unknown;
+          p_usage?: unknown;
+        };
+        Returns: {
+          assumptions_written: number;
+          costs_written: number;
+          sources_added: number;
+          funding_written: number;
+          next_stage: string | null;
+        };
+      };
+      financial_fail_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_error_code: string;
+          p_error_message: string;
+          p_terminal?: boolean;
+          p_usage?: unknown;
+        };
+        Returns: undefined;
+      };
+      /**
+       * The ONLY user-write path into the model. Users change assumptions;
+       * calculated outputs are not writable, because they are not inputs.
+       */
+      financial_set_assumption: {
+        Args: {
+          p_project_id: string;
+          p_key: string;
+          p_unit: string;
+          p_value_minor?: number | null;
+          p_value_int?: number | null;
+          p_label?: string | null;
+        };
+        Returns: string;
+      };
+
       // --- Migration 0015: competitor admin observability ---------------
       /** Competitor operational counters for the admin dashboard. */
       admin_competitor_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+
+      // --- Migration 0016: financial admin observability ----------------
+      /**
+       * Financial operational counters for the admin dashboard.
+       *
+       * Permission-gated block by block inside the function, so an absent key
+       * means "you may not read this", not "the value is zero".
+       */
+      admin_financial_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;
       };

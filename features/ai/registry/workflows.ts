@@ -15,6 +15,7 @@ import {
 } from "@/lib/validations/business-plan";
 import { RESEARCH_WORKFLOWS } from "@/features/research/stages/workflows";
 import { COMPETITOR_WORKFLOWS } from "@/features/competitors/stages/workflows";
+import { FINANCIAL_WORKFLOWS } from "@/features/financials/stages/workflows";
 
 /**
  * Workflow Registry (AI-PLATFORM-SPEC.md, WORKFLOW-MANAGER-SPEC.md).
@@ -64,6 +65,12 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
   // Three of them declare `capability: "research"` and reach the web through
   // `AiProvider.research()`; the other four reason over stored rows.
   ...COMPETITOR_WORKFLOWS,
+
+  // Phase 8: the FIVE AI stages of Financial Intelligence. There are eight
+  // stages; the missing three are computed by `features/financials/calc` and
+  // deliberately have no workflow, because no language model may produce an
+  // authoritative financial figure.
+  ...FINANCIAL_WORKFLOWS,
 };
 
 /**

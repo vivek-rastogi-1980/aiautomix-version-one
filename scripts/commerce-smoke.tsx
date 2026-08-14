@@ -42,13 +42,17 @@ function check(name: string, condition: boolean, detail = ""): void {
 }
 
 function main(): void {
-  const migration = readFileSync(
-    path.join(
-      process.cwd(),
-      "supabase/migrations/0007_sprint6_5_commercial_platform.sql",
-    ),
-    "utf8",
-  );
+  // Entitlement pairs are seeded across migrations: 0007 established the
+  // catalog, and each later phase seeds its own feature. The invariant is that
+  // every plan x feature pair exists SOMEWHERE, so all seeding migrations are
+  // read together — checking only 0007 would fail the moment a phase adds a
+  // feature, for the wrong reason.
+  const migration = [
+    "supabase/migrations/0007_sprint6_5_commercial_platform.sql",
+    "supabase/migrations/0016_phase8_financial_intelligence.sql",
+  ]
+    .map((file) => readFileSync(path.join(process.cwd(), file), "utf8"))
+    .join("\n");
 
   // --- Plan catalog ---------------------------------------------------------
   check("five plans defined", PLAN_IDS.length === 5, PLAN_IDS.join(", "));
@@ -58,12 +62,12 @@ function main(): void {
       new RegExp(`\\('${id}',`).test(migration),
     );
   }
-  check("seven features defined", FEATURES.length === 7);
+  check("eight features defined", FEATURES.length === 8);
 
   // Every plan must state a position on every feature. A missing pair is worse
   // than a denial: `canAccess` finds no row and falls through to its
   // fail-closed default, so the feature silently disappears from a paid plan.
-  // 5 plans x 7 features = 35 rows.
+  // 5 plans x 8 features = 40 rows.
   let missingPairs = 0;
   for (const plan of PLAN_IDS) {
     for (const feature of FEATURES) {
@@ -76,10 +80,11 @@ function main(): void {
       }
     }
   }
+  const expectedPairs = PLAN_IDS.length * FEATURES.length;
   check(
-    "all 35 plan x feature entitlement pairs are seeded",
+    `all ${expectedPairs} plan x feature entitlement pairs are seeded`,
     missingPairs === 0,
-    `${35 - missingPairs}/35 present`,
+    `${expectedPairs - missingPairs}/${expectedPairs} present`,
   );
 
   // Price formatting — minor units, and the quote-only case.
