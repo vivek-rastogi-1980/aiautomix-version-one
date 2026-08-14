@@ -1112,6 +1112,240 @@ export type FinancialResultRow = {
   updated_at: string;
 };
 
+// ---------------------------------------------------------------------------
+// Migration 0017 — Marketing & Go-To-Market Intelligence
+//
+// No client write path exists for any of these. Every write goes through a
+// security-definer function, so there is no `Insert` shape a browser can use.
+// ---------------------------------------------------------------------------
+
+export type GtmStageCostRow = { stage: string; credits: number };
+
+export type GtmProjectRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_idea_id: string | null;
+  business_plan_id: string | null;
+  research_request_id: string | null;
+  competitor_project_id: string | null;
+  financial_project_id: string | null;
+  title: string;
+  description: string | null;
+  industry: string | null;
+  geography: string | null;
+  /** ISO 4217. Required — a budget whose currency was assumed means nothing. */
+  currency: string;
+  /** Decides the funnel template. Null until the planning stage sets it. */
+  motion: string | null;
+  /** A target the business chose, never a forecast. */
+  target_new_customers: number;
+  target_horizon_months: number;
+  payback_months: number;
+  /** Basis points. 30000 = 3.0x. */
+  target_ltv_cac_bps: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GtmRunRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  status: string;
+  current_stage: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  claim_count: number;
+  persona_count: number;
+  channel_count: number;
+  campaign_count: number;
+  action_count: number;
+  source_count: number;
+  error: string | null;
+  locked_at: string | null;
+  locked_stage: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  last_stage_started_at: string | null;
+  last_stage_completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GtmRunStageRow = {
+  id: string;
+  run_id: string;
+  workspace_id: string;
+  stage: string;
+  attempt: number;
+  status: string;
+  ai_usage_log_id: string | null;
+  credits_charged: number;
+  credits_refunded: number;
+  prompt_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  duration_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+/** One statement with its epistemic status attached. A FACT carries a source. */
+export type GtmClaimRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  stage: string;
+  topic: string;
+  statement: string;
+  kind: string;
+  rationale: string | null;
+  source_url: string | null;
+  source_host: string | null;
+  confidence: string;
+  created_at: string;
+};
+
+export type GtmPersonaRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  name: string;
+  role: string;
+  segment: string | null;
+  company_type: string | null;
+  company_size: string | null;
+  geography: string | null;
+  /** Arrays of claim objects: {statement, kind, confidence, rationale?}. */
+  pain_points: unknown;
+  goals: unknown;
+  buying_triggers: unknown;
+  objections: unknown;
+  decision_criteria: unknown;
+  urgency: string | null;
+  budget_signals: string | null;
+  is_decision_maker: boolean;
+  confidence: string;
+  display_order: number;
+  created_at: string;
+};
+
+export type GtmChannelRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  channel: string;
+  rationale: string | null;
+  target_audience: string | null;
+  acquisition_mechanism: string | null;
+  effort: string;
+  cost_band: string;
+  strengths: unknown;
+  weaknesses: unknown;
+  prerequisites: unknown;
+  /** The model's contribution: integers 0-5 per published dimension. */
+  ratings: unknown;
+  /** The engine's: per-dimension contribution in basis points. */
+  contributions: unknown;
+  /** Computed by features/marketing/scoring.ts. No model writes this. */
+  score_bps: number;
+  priority: string;
+  priority_note: string | null;
+  evidence_url: string | null;
+  evidence_host: string | null;
+  evidence_note: string | null;
+  confidence: string;
+  created_at: string;
+};
+
+export type GtmFunnelStepRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  step_order: number;
+  from_stage: string;
+  to_stage: string;
+  /** Whole basis points. Read by the deterministic acquisition engine. */
+  rate_bps: number;
+  kind: string;
+  rationale: string | null;
+  confidence: string;
+  created_at: string;
+};
+
+export type GtmCampaignRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  name: string;
+  objective: string;
+  audience: string | null;
+  message: string | null;
+  offer: string | null;
+  channels: unknown;
+  call_to_action: string | null;
+  funnel_band: string;
+  measurement_kpi: string;
+  confidence: string;
+  display_order: number;
+  created_at: string;
+};
+
+export type GtmPlanActionRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  period: string;
+  objective: string;
+  action: string;
+  channel: string | null;
+  owner_role: string;
+  kpi: string;
+  expected_output: string | null;
+  dependency: string | null;
+  priority: string;
+  display_order: number;
+  created_at: string;
+};
+
+export type GtmSourceRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  url: string;
+  canonical_url: string | null;
+  title: string | null;
+  publisher: string | null;
+  published_at: string | null;
+  status: string;
+  metadata: unknown;
+  retrieved_at: string;
+  created_at: string;
+};
+
+export type GtmResultRow = {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  section_key: string;
+  structured_content: unknown;
+  confidence: string;
+  status: string;
+  version: number;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -1520,6 +1754,119 @@ export interface Database {
         Update: Partial<FinancialResultRow>;
         Relationships: [];
       };
+
+      // --- Migration 0017: marketing & go-to-market intelligence ---------
+      // No client write path exists for any of these; every write goes through
+      // a security-definer function.
+      gtm_stage_costs: {
+        Row: GtmStageCostRow;
+        Insert: GtmStageCostRow;
+        Update: Partial<GtmStageCostRow>;
+        Relationships: [];
+      };
+      gtm_projects: {
+        Row: GtmProjectRow;
+        Insert: Omit<GtmProjectRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<GtmProjectRow>;
+        Relationships: [];
+      };
+      gtm_runs: {
+        Row: GtmRunRow;
+        Insert: Omit<GtmRunRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<GtmRunRow>;
+        Relationships: [];
+      };
+      gtm_run_stages: {
+        Row: GtmRunStageRow;
+        Insert: Omit<GtmRunStageRow, "id" | "started_at"> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<GtmRunStageRow>;
+        Relationships: [];
+      };
+      gtm_claims: {
+        Row: GtmClaimRow;
+        Insert: Omit<GtmClaimRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmClaimRow>;
+        Relationships: [];
+      };
+      gtm_personas: {
+        Row: GtmPersonaRow;
+        Insert: Omit<GtmPersonaRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmPersonaRow>;
+        Relationships: [];
+      };
+      gtm_channels: {
+        Row: GtmChannelRow;
+        Insert: Omit<GtmChannelRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmChannelRow>;
+        Relationships: [];
+      };
+      gtm_funnel_steps: {
+        Row: GtmFunnelStepRow;
+        Insert: Omit<GtmFunnelStepRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmFunnelStepRow>;
+        Relationships: [];
+      };
+      gtm_campaigns: {
+        Row: GtmCampaignRow;
+        Insert: Omit<GtmCampaignRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmCampaignRow>;
+        Relationships: [];
+      };
+      gtm_plan_actions: {
+        Row: GtmPlanActionRow;
+        Insert: Omit<GtmPlanActionRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<GtmPlanActionRow>;
+        Relationships: [];
+      };
+      gtm_sources: {
+        Row: GtmSourceRow;
+        Insert: Omit<GtmSourceRow, "id" | "created_at" | "retrieved_at"> & {
+          id?: string;
+          created_at?: string;
+          retrieved_at?: string;
+        };
+        Update: Partial<GtmSourceRow>;
+        Relationships: [];
+      };
+      gtm_results: {
+        Row: GtmResultRow;
+        Insert: Omit<GtmResultRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<GtmResultRow>;
+        Relationships: [];
+      };
     };
     Views: {
       research_request_overview: {
@@ -1719,6 +2066,93 @@ export interface Database {
       admin_financial_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;
+      };
+
+      // --- Migration 0017: marketing & GTM intelligence ------------------
+      /** Marketing operational counters for the admin dashboard. */
+      admin_gtm_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+      /** Total credits for a full GTM run. The compute stage contributes 0. */
+      gtm_estimate_credits: { Args: Record<string, never>; Returns: number };
+      /** Creates a GTM project. Re-derives edit permission from auth.uid(). */
+      gtm_create_project: {
+        Args: {
+          p_workspace_id: string;
+          p_title: string;
+          p_currency: string;
+          p_description?: string | null;
+          p_industry?: string | null;
+          p_geography?: string | null;
+          p_motion?: string | null;
+          p_target_new_customers?: number | null;
+          p_target_horizon_months?: number | null;
+          p_payback_months?: number | null;
+          p_target_ltv_cac_bps?: number | null;
+          p_business_idea_id?: string | null;
+          p_business_plan_id?: string | null;
+          p_research_request_id?: string | null;
+          p_competitor_project_id?: string | null;
+          p_financial_project_id?: string | null;
+        };
+        Returns: string;
+      };
+      gtm_start_run: { Args: { p_project_id: string }; Returns: string };
+      /**
+       * Claims the next stage under a row lock. The lock is what stops two
+       * tabs running the same stage and being charged twice.
+       */
+      gtm_claim_stage: {
+        Args: {
+          p_run_id: string;
+          p_max_attempts?: number;
+          p_lock_timeout_ms?: number;
+        };
+        Returns: {
+          stage: string;
+          attempt: number;
+          workspace_id: string;
+          project_id: string;
+        }[];
+      };
+      /**
+       * Persists a stage's output and advances the pointer in one transaction.
+       * Accepts no score, no priority and no budget as separate arguments —
+       * those arrive already computed inside the payloads.
+       */
+      gtm_complete_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_next_stage?: string | null;
+          p_results?: unknown;
+          p_claims?: unknown;
+          p_personas?: unknown;
+          p_channels?: unknown;
+          p_funnel_steps?: unknown;
+          p_campaigns?: unknown;
+          p_plan_actions?: unknown;
+          p_sources?: unknown;
+          p_project_patch?: unknown;
+          p_usage?: unknown;
+          p_credits?: number;
+        };
+        Returns: void;
+      };
+      /** Records a failure WITHOUT advancing, so a retry runs the same stage. */
+      gtm_fail_stage: {
+        Args: {
+          p_run_id: string;
+          p_stage: string;
+          p_attempt: number;
+          p_error_code: string;
+          p_error_message: string;
+          p_credits_refunded?: number;
+          p_usage?: unknown;
+        };
+        Returns: void;
       };
 
       // --- Migration 0014: competitor intelligence ----------------------

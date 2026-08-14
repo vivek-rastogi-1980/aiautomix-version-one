@@ -392,3 +392,26 @@ export async function getFinancialStats(
   if (error) return null;
   return (data as Record<string, number | string>) ?? null;
 }
+
+/**
+ * Marketing Intelligence counters.
+ *
+ * The fourth additive aggregate, on the same terms as the three before it:
+ * counted in SQL, permission-gated inside the function, and separate so an
+ * already-deployed dashboard keeps returning exactly what it returned before.
+ *
+ * Two of its keys are worth watching operationally rather than commercially.
+ * `gtm_facts` against `gtm_assumptions` is the ratio of evidence to supposition
+ * across every plan the platform has produced; if assumptions dominate, the
+ * retrieval stage is not earning its cost.
+ */
+export async function getGtmStats(
+  since?: Date,
+): Promise<Record<string, number | string> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_gtm_stats", {
+    p_since: since ? since.toISOString() : null,
+  });
+  if (error) return null;
+  return (data as Record<string, number | string>) ?? null;
+}

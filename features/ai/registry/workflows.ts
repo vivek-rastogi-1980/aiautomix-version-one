@@ -16,6 +16,7 @@ import {
 import { RESEARCH_WORKFLOWS } from "@/features/research/stages/workflows";
 import { COMPETITOR_WORKFLOWS } from "@/features/competitors/stages/workflows";
 import { FINANCIAL_WORKFLOWS } from "@/features/financials/stages/workflows";
+import { GTM_WORKFLOWS } from "@/features/marketing/stages/workflows";
 
 /**
  * Workflow Registry (AI-PLATFORM-SPEC.md, WORKFLOW-MANAGER-SPEC.md).
@@ -71,6 +72,12 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
   // deliberately have no workflow, because no language model may produce an
   // authoritative financial figure.
   ...FINANCIAL_WORKFLOWS,
+
+  // Phase 9: the SEVEN AI stages of Marketing Intelligence. There are eight
+  // stages; `acquisition_economics` is computed by `features/marketing/calc`
+  // and deliberately has no workflow, because no language model may produce an
+  // authoritative budget. One entry declares `capability: "research"`.
+  ...GTM_WORKFLOWS,
 };
 
 /**

@@ -12,6 +12,7 @@ import {
   getResearchStats,
   getCompetitorStats,
   getFinancialStats,
+  getGtmStats,
 } from "@/features/admin/research-ops";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
@@ -43,6 +44,7 @@ export default async function AdminDashboard() {
     research,
     competitors,
     financials,
+    marketing,
     failures,
     workspaces,
     credits,
@@ -54,6 +56,7 @@ export default async function AdminDashboard() {
     getResearchStats(),
     getCompetitorStats(),
     getFinancialStats(),
+    getGtmStats(),
     has("ai.read") ? recentFailures(6) : Promise.resolve([]),
     has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
     has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
@@ -77,6 +80,11 @@ export default async function AdminDashboard() {
 
   const financialNum = (key: string): number | null => {
     const value = financials?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const marketingNum = (key: string): number | null => {
+    const value = marketing?.[key];
     return typeof value === "number" ? value : null;
   };
 
@@ -267,6 +275,27 @@ export default async function AdminDashboard() {
             label="Funding options found"
             value={financialNum("funding_options")}
             sub="Citation-backed only"
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="GTM plans"
+            value={marketingNum("gtm_projects")}
+            sub={
+              marketingNum("gtm_runs") !== null
+                ? `${marketingNum("gtm_runs")} runs`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="GTM claims"
+            value={marketingNum("gtm_claims")}
+            sub={
+              marketingNum("gtm_facts") !== null &&
+              marketingNum("gtm_assumptions") !== null
+                ? `${marketingNum("gtm_facts")} cited facts · ${marketingNum("gtm_assumptions")} assumptions`
+                : undefined
+            }
             unavailableNote="Requires ai.read"
           />
         </div>

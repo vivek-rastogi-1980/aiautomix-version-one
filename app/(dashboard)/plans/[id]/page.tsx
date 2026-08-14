@@ -14,6 +14,7 @@ import { SectionEditor } from "@/features/business-plans/section-editor";
 import { StartResearchLink } from "@/features/research/start-research-link";
 import { StartCompetitorsLink } from "@/features/competitors/start-competitors-link";
 import { StartFinancialsLink } from "@/features/financials/start-financials-link";
+import { StartMarketingLink } from "@/features/marketing/start-marketing-link";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -69,6 +70,7 @@ export default async function PlanPage({ params }: PageProps) {
             <StartResearchLink planId={plan.id} />
             <StartCompetitorsLink planId={plan.id} />
             <StartFinancialsLink planId={plan.id} />
+            <StartMarketingLink planId={plan.id} />
             {sections.length > 0 ? (
               <DownloadPdfButton
                 href={`/api/business-plans/${plan.id}/pdf`}
