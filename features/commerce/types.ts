@@ -24,6 +24,10 @@ export const FEATURES = [
   // Phase 8. Seeded across all five plans by migration 0016 — without the
   // seed `canAccess` finds no row and fails closed for every customer.
   "financial_intelligence",
+  // Phase 9. Seeded across all five plans by migration 0017. Deliberately its
+  // own flag: owning market research says nothing about whether a plan includes
+  // go-to-market work, so access is never inferred from a neighbouring feature.
+  "marketing_intelligence",
   "team_members",
   "api_access",
 ] as const;
