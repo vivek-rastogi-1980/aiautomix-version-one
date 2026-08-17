@@ -28,6 +28,10 @@ export const FEATURES = [
   // own flag: owning market research says nothing about whether a plan includes
   // go-to-market work, so access is never inferred from a neighbouring feature.
   "marketing_intelligence",
+  // Phase 10.1. Seeded across all five plans by migration 0018. Its own
+  // flag: planning go-to-market work says nothing about whether a
+  // workspace may reach outside AIAutoMix and change things.
+  "business_execution",
   "team_members",
   "api_access",
 ] as const;

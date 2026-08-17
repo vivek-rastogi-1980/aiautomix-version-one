@@ -51,6 +51,7 @@ function main(): void {
     "supabase/migrations/0007_sprint6_5_commercial_platform.sql",
     "supabase/migrations/0016_phase8_financial_intelligence.sql",
     "supabase/migrations/0017_phase9_marketing_intelligence.sql",
+    "supabase/migrations/0018_phase10_execution_foundation.sql",
   ]
     .map((file) => readFileSync(path.join(process.cwd(), file), "utf8"))
     .join("\n");
@@ -63,12 +64,12 @@ function main(): void {
       new RegExp(`\\('${id}',`).test(migration),
     );
   }
-  check("nine features defined", FEATURES.length === 9);
+  check("ten features defined", FEATURES.length === 10);
 
   // Every plan must state a position on every feature. A missing pair is worse
   // than a denial: `canAccess` finds no row and falls through to its
   // fail-closed default, so the feature silently disappears from a paid plan.
-  // 5 plans x 9 features = 45 rows.
+  // 5 plans x 10 features = 50 rows.
   let missingPairs = 0;
   for (const plan of PLAN_IDS) {
     for (const feature of FEATURES) {

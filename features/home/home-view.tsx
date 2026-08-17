@@ -14,6 +14,7 @@ import { asStyle } from "@/lib/styles";
 import { trackEvent } from "@/lib/analytics/events";
 import { submitLead } from "@/lib/leads/submit";
 import { useMergedState } from "@/hooks/use-merged-state";
+import { AuthNavLinks } from "@/components/layout/auth-nav-links";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars -- faithful re-host of the design's imperative animation controller; see MIGRATION-NOTES.md */
 
 const PAGE_CSS = `
@@ -1943,7 +1944,7 @@ class HomeController {
         rotate: -3,
         placeholder: "Restaurant AI solution photo",
         imgSrc: "./assets/trending-restaurant.jpeg",
-        link: "./Restaurant AI Automation.dc.html",
+        link: "/restaurant-ai-automation",
       },
       {
         label: "Hospital",
@@ -1951,7 +1952,7 @@ class HomeController {
         rotate: -1.5,
         placeholder: "Hospital AI solution photo",
         imgSrc: "./assets/trending-hospital.png",
-        link: "./Hospital AI Automation.dc.html",
+        link: "/hospital-ai-automation",
       },
       {
         label: "Education",
@@ -1959,7 +1960,7 @@ class HomeController {
         rotate: 0,
         placeholder: "Education AI solution photo",
         imgSrc: "./assets/trending-education.jpeg",
-        link: "./Education AI Automation.dc.html",
+        link: "/education-ai-automation",
       },
       {
         label: "Real Estate",
@@ -1967,7 +1968,7 @@ class HomeController {
         rotate: 1.5,
         placeholder: "Real estate AI solution photo",
         imgSrc: "./assets/trending-realestate.jpeg",
-        link: "./Real Estate AI Automation.dc.html",
+        link: "/real-estate-ai-automation",
       },
       {
         label: "Travel",
@@ -1985,6 +1986,10 @@ class HomeController {
         placeholder: "Gym AI solution photo",
         imgSrc:
           "https://d8j0ntlcm91z4.cloudfront.net/user_3G7jqbleGK3BkzSMBLQtaF7DTkk/hf_20260723_131424_66130b83-aa75-481a-ade0-2b5e2ead34d0.png",
+        // No dedicated gym page exists yet, and an "Explore Now" that does
+        // nothing reads as broken. Services is the nearest real destination
+        // until a gym page is written.
+        link: "/services",
       },
     ];
     const trendingCards = trendingDefs.map((t?: any, i?: any) => ({
@@ -3258,6 +3263,7 @@ export function HomeView() {
               pointerEvents: "auto",
             }}
           >
+            <AuthNavLinks />
             <div
               onClick={openStrategyModal}
               style={{
@@ -5920,6 +5926,41 @@ export function HomeView() {
                     transition: "transform 1.1s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 >
+                  <img
+                    src="https://d8j0ntlcm91z4.cloudfront.net/user_3G7jqbleGK3BkzSMBLQtaF7DTkk/hf_20260727_110949_b3b4c125-993d-445e-b0a1-56eb40fabc60.png"
+                    alt="Growth analytics surfacing the next best move"
+                    style={{
+                      position: "absolute",
+                      inset: "0",
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                    loading="lazy"
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    flexWrap: "wrap",
+                    marginTop: "24px",
+                    maxWidth: "320px",
+                    marginLeft: "auto",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "'Bricolage Grotesque',sans-serif",
+                      fontSize: "17px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {"See what we create"}
+                  </span>{" "}
                   <Link
                     href="/growth-plan"
                     style={{

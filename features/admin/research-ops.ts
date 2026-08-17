@@ -415,3 +415,23 @@ export async function getGtmStats(
   if (error) return null;
   return (data as Record<string, number | string>) ?? null;
 }
+
+/**
+ * Business Execution counters.
+ *
+ * The fifth additive aggregate, on the same terms as the four before it. Two of
+ * its keys matter operationally rather than commercially: `actions_awaiting_approval`
+ * is work blocked on a human, and `runs_retried` against `execution_runs` is how
+ * often the platform is failing in a way worth trying again — a ratio that
+ * should stay small once real providers exist.
+ */
+export async function getExecutionStats(
+  since?: Date,
+): Promise<Record<string, number | string> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_execution_stats", {
+    p_since: since ? since.toISOString() : null,
+  });
+  if (error) return null;
+  return (data as Record<string, number | string>) ?? null;
+}

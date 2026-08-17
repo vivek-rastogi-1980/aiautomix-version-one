@@ -13,6 +13,7 @@ import {
   getCompetitorStats,
   getFinancialStats,
   getGtmStats,
+  getExecutionStats,
 } from "@/features/admin/research-ops";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
@@ -45,6 +46,7 @@ export default async function AdminDashboard() {
     competitors,
     financials,
     marketing,
+    execution,
     failures,
     workspaces,
     credits,
@@ -57,6 +59,7 @@ export default async function AdminDashboard() {
     getCompetitorStats(),
     getFinancialStats(),
     getGtmStats(),
+    getExecutionStats(),
     has("ai.read") ? recentFailures(6) : Promise.resolve([]),
     has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
     has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
@@ -85,6 +88,11 @@ export default async function AdminDashboard() {
 
   const marketingNum = (key: string): number | null => {
     const value = marketing?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const executionNum = (key: string): number | null => {
+    const value = execution?.[key];
     return typeof value === "number" ? value : null;
   };
 
@@ -283,6 +291,27 @@ export default async function AdminDashboard() {
             sub={
               marketingNum("gtm_runs") !== null
                 ? `${marketingNum("gtm_runs")} runs`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Execution actions"
+            value={executionNum("execution_actions")}
+            sub={
+              executionNum("actions_awaiting_approval") !== null
+                ? `${executionNum("actions_awaiting_approval")} awaiting approval`
+                : undefined
+            }
+            unavailableNote="Requires ai.read"
+          />
+          <Stat
+            label="Execution runs"
+            value={executionNum("execution_runs")}
+            sub={
+              executionNum("runs_failed") !== null &&
+              executionNum("runs_retried") !== null
+                ? `${executionNum("runs_failed")} failed · ${executionNum("runs_retried")} retried`
                 : undefined
             }
             unavailableNote="Requires ai.read"
