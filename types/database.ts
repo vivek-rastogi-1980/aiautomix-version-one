@@ -1346,6 +1346,90 @@ export type GtmResultRow = {
   updated_at: string;
 };
 
+// ---------------------------------------------------------------------------
+// Migration 0018 - AI Business Execution Foundation
+//
+// No client write path exists for any of these. Every write goes through a
+// security-definer function, so there is no `Insert` shape a browser can use.
+// ---------------------------------------------------------------------------
+
+export type ExecutionPlanRow = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  gtm_project_id: string | null;
+  business_plan_id: string | null;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExecutionActionRow = {
+  id: string;
+  workspace_id: string;
+  execution_plan_id: string;
+  action_type: string;
+  title: string;
+  description: string | null;
+  /** Validated against the action type's registered Zod schema before storage. */
+  input: unknown;
+  expected_output: unknown;
+  status: string;
+  approval_required: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  execution_provider: string;
+  external_execution_id: string | null;
+  result: unknown;
+  error: string | null;
+  error_code: string | null;
+  /** Server-owned. No RPC accepts it as a parameter. */
+  retry_count: number;
+  /** Set when this action supersedes a COMPLETED one. */
+  revision_of: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+export type ExecutionRunRow = {
+  id: string;
+  workspace_id: string;
+  action_id: string;
+  provider: string;
+  attempt: number;
+  /** Server-derived and UNIQUE, so a duplicate dispatch collides. */
+  idempotency_key: string;
+  status: string;
+  external_execution_id: string | null;
+  result_summary: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+};
+
+/** Append-only. UPDATE and DELETE are rejected by trigger for every role. */
+export type ExecutionAuditLogRow = {
+  id: string;
+  workspace_id: string;
+  actor_user_id: string;
+  /** The actor's workspace role at the time, not their current one. */
+  actor_role: string;
+  event: string;
+  entity_type: string;
+  entity_id: string;
+  previous_state: string | null;
+  new_state: string | null;
+  reason: string | null;
+  metadata: unknown;
+  created_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -1867,6 +1951,46 @@ export interface Database {
         Update: Partial<GtmResultRow>;
         Relationships: [];
       };
+
+      // --- Migration 0018: AI business execution foundation --------------
+      execution_plans: {
+        Row: ExecutionPlanRow;
+        Insert: Omit<ExecutionPlanRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<ExecutionPlanRow>;
+        Relationships: [];
+      };
+      execution_actions: {
+        Row: ExecutionActionRow;
+        Insert: Omit<ExecutionActionRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<ExecutionActionRow>;
+        Relationships: [];
+      };
+      execution_runs: {
+        Row: ExecutionRunRow;
+        Insert: Omit<ExecutionRunRow, "id" | "started_at"> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<ExecutionRunRow>;
+        Relationships: [];
+      };
+      execution_audit_logs: {
+        Row: ExecutionAuditLogRow;
+        Insert: Omit<ExecutionAuditLogRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<ExecutionAuditLogRow>;
+        Relationships: [];
+      };
     };
     Views: {
       research_request_overview: {
@@ -2073,6 +2197,96 @@ export interface Database {
       admin_gtm_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;
+      };
+
+      // --- Migration 0018: business execution ----------------------------
+      /** Execution operational counters for the admin dashboard. */
+      admin_execution_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+      /** Records a state change. Called inside every mutating RPC. */
+      execution_audit: {
+        Args: {
+          p_workspace_id: string;
+          p_event: string;
+          p_entity_type: string;
+          p_entity_id: string;
+          p_previous_state?: string | null;
+          p_new_state?: string | null;
+          p_reason?: string | null;
+          p_metadata?: unknown;
+        };
+        Returns: string;
+      };
+      execution_create_plan: {
+        Args: {
+          p_workspace_id: string;
+          p_title: string;
+          p_description?: string | null;
+          p_gtm_project_id?: string | null;
+          p_business_plan_id?: string | null;
+        };
+        Returns: string;
+      };
+      execution_add_action: {
+        Args: {
+          p_plan_id: string;
+          p_action_type: string;
+          p_title: string;
+          p_description?: string | null;
+          p_input?: unknown;
+          p_expected_output?: unknown;
+          p_approval_required?: boolean;
+          p_provider?: string;
+          p_display_order?: number;
+          p_revision_of?: string | null;
+        };
+        Returns: string;
+      };
+      /**
+       * The single write path for action status. Takes the state the caller
+       * believes the action is in and refuses if it has moved, which is what
+       * stops two tabs approving and executing the same action in a race.
+       */
+      execution_transition: {
+        Args: {
+          p_action_id: string;
+          p_expected_state: string;
+          p_new_state: string;
+          p_reason?: string | null;
+        };
+        Returns: string;
+      };
+      /**
+       * Claims an attempt row. On an idempotency-key collision it returns the
+       * EXISTING run rather than creating a duplicate external effect.
+       */
+      execution_claim_run: {
+        Args: {
+          p_action_id: string;
+          p_provider: string;
+          p_attempt: number;
+          p_idempotency_key: string;
+        };
+        Returns: { run_id: string; was_existing: boolean }[];
+      };
+      execution_record_result: {
+        Args: {
+          p_run_id: string;
+          p_status: string;
+          p_external_id?: string | null;
+          p_summary?: string | null;
+          p_error_code?: string | null;
+          p_error_message?: string | null;
+          p_result?: unknown;
+          p_duration_ms?: number | null;
+        };
+        Returns: void;
+      };
+      execution_set_plan_status: {
+        Args: { p_plan_id: string; p_status: string };
+        Returns: void;
       };
       /** Total credits for a full GTM run. The compute stage contributes 0. */
       gtm_estimate_credits: { Args: Record<string, never>; Returns: number };
