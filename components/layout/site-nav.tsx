@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import { AuthNavLinks } from "@/components/layout/auth-nav-links";
+
 const NAV_CSS = `
   @keyframes beamFlicker { 0%,100% { opacity: 0.85; } 45% { opacity: 1; } 50% { opacity: 0.7; } 55% { opacity: 1; } }
   @keyframes navLogoFloat { 0%,100% { transform: translateY(0); filter: drop-shadow(0 0 10px rgba(255,255,255,0.85)) drop-shadow(0 0 18px rgba(180,150,255,0.5)) brightness(1.1); } 50% { transform: translateY(-4px); filter: drop-shadow(0 0 16px rgba(255,255,255,1)) drop-shadow(0 0 26px rgba(180,150,255,0.7)) brightness(1.25); } }
@@ -121,20 +123,7 @@ export function SiteNav() {
           </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Link
-            href="/login"
-            style={{
-              padding: "11px 18px",
-              borderRadius: "100px",
-              color: "#F4F1EA",
-              fontSize: "13px",
-              fontWeight: "600",
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {"Log in"}
-          </Link>
+          <AuthNavLinks />
           <Link
             href="/contact"
             style={{

@@ -4,6 +4,7 @@ import { Fragment, type MouseEvent } from "react";
 import Link from "next/link";
 import { asStyle } from "@/lib/styles";
 import { useMergedState } from "@/hooks/use-merged-state";
+import { AuthNavLinks } from "@/components/layout/auth-nav-links";
 
 const PAGE_CSS = `
 body { margin: 0; background: #0A0B0F; }
@@ -555,6 +556,7 @@ export function MobileAppDevelopmentView() {
             </div>
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AuthNavLinks />
             <div
               onClick={goConsult}
               style={{
