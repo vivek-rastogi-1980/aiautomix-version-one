@@ -63,6 +63,26 @@ function main(): void {
     "utf8",
   );
 
+  // The RBAC matrix alone is seeded across migrations: 0008 established it and
+  // each later phase grants its own permissions. Only the grant parse and the
+  // permission-constraint check read both.
+  //
+  // The security assertions further down stay scoped to `migration`, because
+  // several of them — "no email-based authorization" in particular — are
+  // statements about THIS migration's executable SQL. Widening them to a file
+  // that legitimately stores contact emails would not make them stronger; it
+  // would make them meaningless.
+  const rbacSeed =
+    migration +
+    "\n" +
+    readFileSync(
+      path.join(
+        process.cwd(),
+        "supabase/migrations/0019_client_onboarding.sql",
+      ),
+      "utf8",
+    );
+
   // =========================================================================
   // MIRROR — TypeScript matrix vs the seeded SQL
   // =========================================================================
@@ -71,7 +91,7 @@ function main(): void {
   const seeded = new Set<string>();
   const seedPattern =
     /\('(SUPER_ADMIN|ADMIN|SUPPORT|ANALYST)',\s*'([a-z_]+\.[a-z_]+)'\)/g;
-  for (const match of migration.matchAll(seedPattern)) {
+  for (const match of rbacSeed.matchAll(seedPattern)) {
     seeded.add(`${match[1]}:${match[2]}`);
   }
   check(
@@ -107,13 +127,15 @@ function main(): void {
     `sql=${seeded.size} ts=${declared.size}`,
   );
 
-  // The four roles and fourteen permissions, per ADMIN-RBAC-SPEC.md.
+  // Four roles, and twenty-one permissions: the fourteen from
+  // ADMIN-RBAC-SPEC.md plus the seven migration 0019 added for client
+  // onboarding.
   check("four admin roles", ADMIN_ROLES.length === 4, ADMIN_ROLES.join(", "));
-  check("fourteen permissions", ADMIN_PERMISSIONS.length === 14);
+  check("twenty-one permissions", ADMIN_PERMISSIONS.length === 21);
   for (const permission of ADMIN_PERMISSIONS) {
     check(
       `permission '${permission}' is constrained in SQL`,
-      migration.includes(`'${permission}'`),
+      rbacSeed.includes(`'${permission}'`),
     );
   }
 
