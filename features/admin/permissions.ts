@@ -50,6 +50,19 @@ export const ADMIN_PERMISSIONS = [
   "entitlements.manage",
   "audit.read",
   "system.read",
+  // Migration 0019 — client onboarding. Added to the existing matrix rather
+  // than a parallel system, so `admin_has()` and every RLS policy in the
+  // platform keep working unchanged.
+  "leads.read",
+  "leads.update",
+  "bookings.read",
+  "bookings.update",
+  "communications.read",
+  "communications.write",
+  // Separated from `communications.write` on purpose: writing a template is an
+  // internal act, sending a test is the one communications action that leaves
+  // the building.
+  "communications.send_test",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -86,6 +99,11 @@ export const ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "credits.read",
     "plans.read",
     "entitlements.read",
+    // Reads only. An agent answering "what happened to my booking?" needs to
+    // see it; changing a lead's lifecycle is a sales decision, not support.
+    "leads.read",
+    "bookings.read",
+    "communications.read",
   ],
   ADMIN: [
     "users.read",
@@ -100,6 +118,15 @@ export const ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
     "entitlements.read",
     "audit.read",
     "system.read",
+    // Migration 0019. ADMIN runs the funnel: reads and works leads, manages
+    // bookings, and authors communications.
+    "leads.read",
+    "leads.update",
+    "bookings.read",
+    "bookings.update",
+    "communications.read",
+    "communications.write",
+    "communications.send_test",
   ],
   SUPER_ADMIN: [...ADMIN_PERMISSIONS],
 };

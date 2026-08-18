@@ -474,6 +474,28 @@ export type Lead = {
   status: LeadStatus;
   created_at: string;
   updated_at: string;
+
+  // --- Migration 0019: client onboarding ---------------------------------
+  // Added to the existing table, not a second one. All nullable, because the
+  // table holds live rows that predate this migration.
+  //
+  // No column here stores a password, a token or a provider credential.
+  /** Set once the visitor has verified their email and has an account. */
+  user_id: string | null;
+  workspace_id: string | null;
+  business_idea_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  industry: string | null;
+  target_customer: string | null;
+  target_market: string | null;
+  business_stage: string | null;
+  problem_solved: string | null;
+  website: string | null;
+  owner_user_id: string | null;
+  last_activity_at: string | null;
+  /** Server-derived and unique, so a resubmitted form collides. */
+  idempotency_key: string | null;
 };
 
 type LeadInsertRow = {
@@ -1430,6 +1452,95 @@ export type ExecutionAuditLogRow = {
   created_at: string;
 };
 
+// ---------------------------------------------------------------------------
+// Migration 0019 - Client onboarding & lead conversion
+//
+// `leads` already existed (0005) and is EXTENDED here, not replaced. No column
+// below stores a password, a token or a provider credential.
+// ---------------------------------------------------------------------------
+
+export type LeadEventRow = {
+  id: string;
+  lead_id: string;
+  event: string;
+  actor_user_id: string | null;
+  previous_status: string | null;
+  new_status: string | null;
+  note: string | null;
+  metadata: unknown;
+  created_at: string;
+};
+
+export type BookingRow = {
+  id: string;
+  user_id: string | null;
+  workspace_id: string | null;
+  lead_id: string | null;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  scheduled_at: string;
+  timezone: string;
+  duration_minutes: number;
+  status: string;
+  meeting_url: string | null;
+  notes: string | null;
+  cancellation_reason: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
+};
+
+export type EmailTemplateRow = {
+  id: string;
+  trigger: string;
+  name: string;
+  description: string | null;
+  status: string;
+  current_version: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Append-only. UPDATE and DELETE are rejected by trigger for every role. */
+export type EmailTemplateVersionRow = {
+  id: string;
+  template_id: string;
+  version: number;
+  subject: string;
+  body_html: string;
+  body_text: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type EmailLogRow = {
+  id: string;
+  template_id: string | null;
+  /** The exact version sent, so "what did they receive?" stays answerable. */
+  template_version_id: string | null;
+  trigger: string | null;
+  recipient_email: string;
+  user_id: string | null;
+  workspace_id: string | null;
+  lead_id: string | null;
+  booking_id: string | null;
+  subject: string | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  status: string;
+  error_code: string | null;
+  error_message: string | null;
+  retry_count: number;
+  is_test: boolean;
+  created_at: string;
+  sent_at: string | null;
+  failed_at: string | null;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -1991,6 +2102,55 @@ export interface Database {
         Update: Partial<ExecutionAuditLogRow>;
         Relationships: [];
       };
+
+      // --- Migration 0019: client onboarding & lead conversion -----------
+      lead_events: {
+        Row: LeadEventRow;
+        Insert: Omit<LeadEventRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<LeadEventRow>;
+        Relationships: [];
+      };
+      bookings: {
+        Row: BookingRow;
+        Insert: Omit<BookingRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<BookingRow>;
+        Relationships: [];
+      };
+      email_templates: {
+        Row: EmailTemplateRow;
+        Insert: Omit<EmailTemplateRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<EmailTemplateRow>;
+        Relationships: [];
+      };
+      email_template_versions: {
+        Row: EmailTemplateVersionRow;
+        Insert: Omit<EmailTemplateVersionRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<EmailTemplateVersionRow>;
+        Relationships: [];
+      };
+      email_logs: {
+        Row: EmailLogRow;
+        Insert: Omit<EmailLogRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<EmailLogRow>;
+        Relationships: [];
+      };
     };
     Views: {
       research_request_overview: {
@@ -2287,6 +2447,119 @@ export interface Database {
       execution_set_plan_status: {
         Args: { p_plan_id: string; p_status: string };
         Returns: void;
+      };
+
+      // --- Migration 0019: client onboarding -----------------------------
+      /** Funnel counters for the admin dashboard. Counted in SQL. */
+      admin_funnel_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, number | string>;
+      };
+      /**
+       * Public lead capture. Callable by anon — the one anonymous write in the
+       * application. Creates no auth user, no workspace and no AI spend:
+       * provisioning waits for a verified email.
+       */
+      lead_capture: {
+        Args: {
+          p_email: string;
+          p_source: string;
+          p_idempotency_key: string;
+          p_first_name?: string | null;
+          p_last_name?: string | null;
+          p_phone?: string | null;
+          p_company?: string | null;
+          p_message?: string | null;
+          p_industry?: string | null;
+          p_target_customer?: string | null;
+          p_target_market?: string | null;
+          p_business_stage?: string | null;
+          p_problem_solved?: string | null;
+          p_website?: string | null;
+          p_landing_page?: string | null;
+          p_referrer?: string | null;
+          p_utm_source?: string | null;
+          p_utm_medium?: string | null;
+          p_utm_campaign?: string | null;
+          p_utm_term?: string | null;
+          p_utm_content?: string | null;
+        };
+        Returns: { lead_id: string; was_existing: boolean }[];
+      };
+      /** Links an anonymous lead to the now-verified user who owns that email. */
+      lead_claim_for_user: {
+        Args: { p_workspace_id: string; p_business_idea_id?: string | null };
+        Returns: string | null;
+      };
+      lead_record_event: {
+        Args: {
+          p_lead_id: string;
+          p_event: string;
+          p_note?: string | null;
+          p_metadata?: unknown;
+        };
+        Returns: string;
+      };
+      lead_set_status: {
+        Args: { p_lead_id: string; p_status: string; p_note?: string | null };
+        Returns: void;
+      };
+      booking_create: {
+        Args: {
+          p_full_name: string;
+          p_email: string;
+          p_scheduled_at: string;
+          p_timezone: string;
+          p_idempotency_key: string;
+          p_phone?: string | null;
+          p_lead_id?: string | null;
+          p_duration?: number;
+          p_notes?: string | null;
+        };
+        Returns: { booking_id: string; was_existing: boolean }[];
+      };
+      booking_set_status: {
+        Args: {
+          p_booking_id: string;
+          p_status: string;
+          p_reason?: string | null;
+          p_meeting_url?: string | null;
+        };
+        Returns: void;
+      };
+      /** Always creates a NEW version. Content is never rewritten in place. */
+      email_template_save: {
+        Args: {
+          p_template_id: string;
+          p_subject: string;
+          p_body_html: string;
+          p_body_text?: string | null;
+        };
+        Returns: number;
+      };
+      email_template_set_status: {
+        Args: { p_template_id: string; p_status: string };
+        Returns: void;
+      };
+      email_log_record: {
+        Args: {
+          p_recipient: string;
+          p_status: string;
+          p_trigger?: string | null;
+          p_template_id?: string | null;
+          p_version_id?: string | null;
+          p_subject?: string | null;
+          p_provider?: string | null;
+          p_message_id?: string | null;
+          p_error_code?: string | null;
+          p_error_message?: string | null;
+          p_user_id?: string | null;
+          p_workspace_id?: string | null;
+          p_lead_id?: string | null;
+          p_booking_id?: string | null;
+          p_is_test?: boolean;
+        };
+        Returns: string;
       };
       /** Total credits for a full GTM run. The compute stage contributes 0. */
       gtm_estimate_credits: { Args: Record<string, never>; Returns: number };
