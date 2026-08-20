@@ -34,8 +34,7 @@ export interface TemplateListRow extends EmailTemplateRow {
 
 function decorate(row: EmailTemplateRow): TemplateListRow {
   const status = TRIGGER_STATUS[row.trigger as EmailTrigger] as
-    | (typeof TRIGGER_STATUS)[EmailTrigger]
-    | undefined;
+    (typeof TRIGGER_STATUS)[EmailTrigger] | undefined;
 
   return {
     ...row,

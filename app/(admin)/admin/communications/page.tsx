@@ -5,7 +5,13 @@ import { requirePermission } from "@/features/admin/guard";
 import { listTemplates } from "@/features/admin/communications";
 import { emailProviderConfigured } from "@/features/communications/service";
 import { mailerSender } from "@/features/communications/mailer";
-import { PageHeader, EmptyState, TableShell, Th, Td } from "@/features/admin/ui";
+import {
+  PageHeader,
+  EmptyState,
+  TableShell,
+  Th,
+  Td,
+} from "@/features/admin/ui";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/format";

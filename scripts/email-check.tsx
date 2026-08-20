@@ -43,7 +43,9 @@ function main(): void {
 
   console.log("SMTP configuration");
   console.log(`  host      ${host ?? "(not set)"}`);
-  console.log(`  port      ${port}${port === IMPLICIT_TLS_PORT ? " (implicit TLS)" : " (STARTTLS)"}`);
+  console.log(
+    `  port      ${port}${port === IMPLICIT_TLS_PORT ? " (implicit TLS)" : " (STARTTLS)"}`,
+  );
   console.log(`  user      ${user ?? "(not set)"}`);
   console.log(`  password  ${pass ? "set" : "(not set)"}`);
   console.log(`  from      ${from ?? "(not set)"}`);

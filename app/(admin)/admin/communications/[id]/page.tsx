@@ -96,9 +96,7 @@ export default async function AdminTemplateDetailPage({
         initialSubject={current?.subject ?? ""}
         initialBodyHtml={current?.body_html ?? ""}
         initialBodyText={current?.body_text ?? ""}
-        status={
-          isTemplateStatus(template.status) ? template.status : "DRAFT"
-        }
+        status={isTemplateStatus(template.status) ? template.status : "DRAFT"}
         currentVersion={template.current_version}
         canWrite={has("communications.write")}
         canSendTest={has("communications.send_test")}

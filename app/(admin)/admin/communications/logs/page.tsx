@@ -21,7 +21,10 @@ import {
 } from "@/features/admin/ui";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { EMAIL_STATUSES, EMAIL_TRIGGERS } from "@/features/communications/events";
+import {
+  EMAIL_STATUSES,
+  EMAIL_TRIGGERS,
+} from "@/features/communications/events";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Delivery log" };
@@ -180,7 +183,9 @@ export default async function AdminEmailLogsPage({
                     {log.trigger ?? "—"}
                   </Td>
                   <Td>
-                    <Badge variant={EMAIL_STATUS_BADGE[log.status] ?? "neutral"}>
+                    <Badge
+                      variant={EMAIL_STATUS_BADGE[log.status] ?? "neutral"}
+                    >
                       {log.status}
                     </Badge>
                     {log.error_message ? (
