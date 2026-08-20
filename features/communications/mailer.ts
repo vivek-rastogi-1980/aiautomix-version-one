@@ -8,14 +8,12 @@ import nodemailer, { type Transporter } from "nodemailer";
  * ---------------------------------------------------------------------------
  * Why SMTP rather than a provider API
  * ---------------------------------------------------------------------------
- * This used to POST to Resend. SMTP replaces it because it needs no third-party
- * account at all: the platform sends through the same Hostinger mailbox the
- * business already owns and already reads. One fewer vendor, one fewer API key,
- * and the "from" address is a real inbox somebody can reply to.
+ * Mail goes out over SMTP through the Hostinger mailbox the business already
+ * owns and already reads. No third-party email service, no API key, and a
+ * "from" address that is a real inbox somebody can reply to.
  *
- * The trade is one dependency (`nodemailer`) for what was a single `fetch`.
- * Worth it — SMTP is a stateful, multi-step protocol with TLS negotiation, and
- * hand-rolling it would be considerably more code than the client it replaces,
+ * The one dependency is `nodemailer`. SMTP is a stateful, multi-step protocol
+ * with TLS negotiation, and hand-rolling it would be more code than the library
  * with more ways to be subtly wrong.
  *
  * ---------------------------------------------------------------------------
@@ -100,10 +98,10 @@ function settings(): SmtpSettings | null {
   const parsedPort = Number.parseInt(process.env.SMTP_PORT ?? "", 10);
   const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 465;
 
-  const configuredFrom =
-    process.env.TRANSACTIONAL_EMAIL_FROM?.trim() ||
-    process.env.LEAD_NOTIFICATION_FROM?.trim() ||
-    "";
+  // One variable, not two. There used to be a `LEAD_NOTIFICATION_FROM`
+  // fallback from the previous provider; two ways to name the sender is how
+  // the address ends up disagreeing with SMTP_USER in the first place.
+  const configuredFrom = process.env.TRANSACTIONAL_EMAIL_FROM?.trim() || "";
 
   return { host, port, user, pass, from: senderFor(configuredFrom, user) };
 }

@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/features/admin/guard";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformConfigured } from "@/features/ai";
+import {
+  mailerConfigured,
+  mailerSender,
+} from "@/features/communications/mailer";
 import { getWorkflowCatalog } from "@/features/ai/registry/catalog";
 import { recentFailures } from "@/features/admin/data";
 import { PageHeader, Stat } from "@/features/admin/ui";
@@ -49,6 +53,12 @@ export default async function AdminSystemHealthPage() {
   ]);
 
   const aiConfigured = isPlatformConfigured();
+  // Read from the environment actually serving this request, which is the whole
+  // point of showing it here: `.env.local` is not deployed, so a transport that
+  // works on a laptop says nothing about production. This is the only place an
+  // operator can see the answer for the environment they are looking at.
+  const mailConfigured = mailerConfigured();
+  const mailSender = mailerSender();
   const activeWorkflows = catalog.filter((entry) => entry.isActive).length;
 
   return (
@@ -75,6 +85,11 @@ export default async function AdminSystemHealthPage() {
           sub="Credential presence only"
         />
         <Stat
+          label="Email transport"
+          value={mailConfigured ? "Configured" : "Not configured"}
+          sub={mailConfigured ? `Sends as ${mailSender}` : "SMTP_HOST / SMTP_USER / SMTP_PASS"}
+        />
+        <Stat
           label="Active workflows"
           value={catalog.length > 0 ? activeWorkflows : null}
           sub={
@@ -83,6 +98,31 @@ export default async function AdminSystemHealthPage() {
           unavailableNote="Workflow registry unreadable"
         />
       </div>
+
+      {!mailConfigured ? (
+        <Card className="mt-6 p-6">
+          <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+            No email is being sent from this environment
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            <code className="font-mono text-xs">SMTP_HOST</code>,{" "}
+            <code className="font-mono text-xs">SMTP_USER</code> and{" "}
+            <code className="font-mono text-xs">SMTP_PASS</code> are not set
+            here. Nothing is failing — forms still work and leads still save —
+            but every send is recorded as{" "}
+            <span className="font-medium">skipped</span> and no message leaves
+            the building. That is why this has no visible symptom until somebody
+            asks why they never got a confirmation.
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Setting these in <code className="font-mono text-xs">.env.local</code>{" "}
+            only affects local development —{" "}
+            <code className="font-mono text-xs">.env.local</code> is not
+            deployed. For production they must be set in the hosting
+            provider&rsquo;s own environment settings, followed by a redeploy.
+          </p>
+        </Card>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-6">

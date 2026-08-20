@@ -33,10 +33,7 @@ function main(): void {
   // Asked of the mailer rather than re-derived, so this prints what the
   // application will ACTUALLY send as. A second copy of the rule here is how a
   // check script ends up confidently reporting a value the app does not use.
-  const configuredFrom =
-    process.env.TRANSACTIONAL_EMAIL_FROM?.trim() ||
-    process.env.LEAD_NOTIFICATION_FROM?.trim() ||
-    "";
+  const configuredFrom = process.env.TRANSACTIONAL_EMAIL_FROM?.trim() || "";
   const from = mailerSender() ?? user;
 
   const recipient = process.argv[2];

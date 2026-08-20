@@ -3,7 +3,7 @@
 For cutting `https://www.aiautomix.com` over to this codebase.
 
 Items marked **MANUAL ACTION REQUIRED** happen outside the repository. Nothing in
-this file about Vercel, DNS, Supabase, Google or Resend has been verified from
+this file about Vercel, DNS, Supabase, Google or Hostinger has been verified from
 here — I have no access to those consoles and make no claim about their state.
 
 ---
@@ -50,7 +50,7 @@ Optional:
 | `OPENAI_MODEL` | defaults to `gpt-4o-mini` |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | no email; leads still persist, sends log as SKIPPED |
 | `LEAD_NOTIFICATION_EMAIL` | defaults to `contact@aiautomix.com` |
-| `LEAD_NOTIFICATION_FROM` | defaults to Resend's shared sender |
+| `TRANSACTIONAL_EMAIL_FROM` | defaults to `SMTP_USER`, the authenticated mailbox |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | analytics disabled entirely |
 
 **Do not set `SUPABASE_SERVICE_ROLE_KEY` on Vercel.** Nothing at runtime reads
