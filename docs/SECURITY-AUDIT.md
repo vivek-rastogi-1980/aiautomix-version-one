@@ -72,7 +72,7 @@ its own regression pass. Do not fold it into a hardening sprint.
 - `SUPABASE_SERVICE_ROLE_KEY` — read only in `scripts/sync-workflows.ts`, which
   runs locally. **Never read at runtime**, so it should not be set on Vercel at
   all. Documented in the launch checklist.
-- `RESEND_API_KEY` — server-only, in `lib/leads/notify.ts`
+- `SMTP_PASS` — server-only, read in `features/communications/mailer.ts` and nowhere else. Never logged: SMTP failures are classified into codes (`SMTP_AUTH_FAILED`, `SMTP_ENVELOPE_REJECTED`) before anything reaches a log line or `email_logs`.
 - No secret is behind a `NEXT_PUBLIC_` prefix
 - `.env.local` is gitignored; no secret appears in tracked files
 

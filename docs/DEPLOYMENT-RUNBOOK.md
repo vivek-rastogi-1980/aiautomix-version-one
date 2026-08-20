@@ -91,7 +91,7 @@ A typo breaks password reset and email confirmation.
 | Variable | If unset |
 | --- | --- |
 | `OPENAI_MODEL` | Defaults to `gpt-4o-mini` |
-| `RESEND_API_KEY` | No lead notification email; **leads still persist** |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | No email at all; **leads still persist** and every send logs as SKIPPED |
 | `LEAD_NOTIFICATION_EMAIL` | Defaults to `contact@aiautomix.com` |
 | `LEAD_NOTIFICATION_FROM` | Defaults to Resend's shared sender |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Analytics disabled entirely |

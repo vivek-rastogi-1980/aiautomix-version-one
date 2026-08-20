@@ -101,7 +101,7 @@ export const TRIGGER_STATUS: Record<EmailTrigger, TriggerStatus> = {
     trigger: "ACCOUNT_WELCOME",
     label: "Welcome",
     wired: true,
-    note: "Raised when a visitor activates and their workspace is provisioned.",
+    note: "Raised by features/onboarding/activation.ts when a visitor follows their one-time link and their workspace is provisioned.",
   },
   ACCOUNT_ACTIVATION: {
     trigger: "ACCOUNT_ACTIVATION",
@@ -113,31 +113,31 @@ export const TRIGGER_STATUS: Record<EmailTrigger, TriggerStatus> = {
     trigger: "IDEA_SUBMITTED",
     label: "Idea received",
     wired: true,
-    note: "Raised by the public idea form.",
+    note: "Raised by POST /api/onboarding/validate-idea when the lead is committed.",
   },
   VALIDATION_STARTED: {
     trigger: "VALIDATION_STARTED",
     label: "Validation started",
     wired: true,
-    note: "Raised when the validator workflow is dispatched.",
+    note: "Raised by the business validator once the idea row is committed and the run begins.",
   },
   VALIDATION_COMPLETED: {
     trigger: "VALIDATION_COMPLETED",
     label: "Validation complete",
     wired: true,
-    note: "Raised when the validator returns a score.",
+    note: "Raised by the business validator once the report is durably stored.",
   },
   VALIDATION_FAILED: {
     trigger: "VALIDATION_FAILED",
     label: "Validation failed",
     wired: true,
-    note: "Raised when the validator workflow errors.",
+    note: "Raised by the business validator when the workflow errors and the idea is marked failed.",
   },
   REPORT_READY: {
     trigger: "REPORT_READY",
     label: "Report ready",
     wired: true,
-    note: "Raised alongside validation completion.",
+    note: "Raised alongside validation completion. A separate trigger because a future async PDF step will separate the two in time.",
   },
   STRATEGY_SESSION_INVITATION: {
     trigger: "STRATEGY_SESSION_INVITATION",
@@ -149,7 +149,7 @@ export const TRIGGER_STATUS: Record<EmailTrigger, TriggerStatus> = {
     trigger: "BOOKING_CONFIRMATION",
     label: "Booking confirmed",
     wired: true,
-    note: "Raised when a booking is created.",
+    note: "Raised by POST /api/onboarding/bookings when the slot is committed.",
   },
   BOOKING_REMINDER_24H: {
     trigger: "BOOKING_REMINDER_24H",
@@ -167,7 +167,7 @@ export const TRIGGER_STATUS: Record<EmailTrigger, TriggerStatus> = {
     trigger: "BOOKING_CANCELLED",
     label: "Booking cancelled",
     wired: true,
-    note: "Raised when a booking moves to CANCELLED.",
+    note: "Raised by the admin booking control when a session moves to CANCELLED.",
   },
   BOOKING_RESCHEDULED: {
     trigger: "BOOKING_RESCHEDULED",
@@ -184,8 +184,8 @@ export const TRIGGER_STATUS: Record<EmailTrigger, TriggerStatus> = {
   GENERAL_NOTIFICATION: {
     trigger: "GENERAL_NOTIFICATION",
     label: "General notification",
-    wired: true,
-    note: "Used for ad-hoc operational messages, including booking completion.",
+    wired: false,
+    note: "BOOKING_COMPLETED maps here, but nothing raises that event: completing a session changes its status and writes the lead timeline without sending anything. There is no message a customer needs at that moment, and wiring one to make this look wired would be the pretence this column exists to prevent.",
   },
 };
 

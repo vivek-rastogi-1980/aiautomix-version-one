@@ -92,6 +92,17 @@ function main(): void {
   const ideaRoute = read("app/api/onboarding/validate-idea/route.ts");
   const bookingRoute = read("app/api/onboarding/bookings/route.ts");
   const validations = read("lib/validations/onboarding.ts");
+  const mailer = read("features/communications/mailer.ts");
+  // Every file permitted to raise a communication event. The honesty check
+  // below scans exactly these, so adding a caller elsewhere and forgetting to
+  // list it here shows up as a trigger that claims to be wired and is not.
+  const eventCallSites = [
+    ideaRoute,
+    bookingRoute,
+    read("features/onboarding/activation.ts"),
+    read("features/onboarding/validation-events.ts"),
+    read("features/admin/actions.ts"),
+  ].map(code);
 
   const featureSources = [engine, service, provisioning].join("\n");
   const routes = [ideaRoute, bookingRoute];
@@ -124,7 +135,7 @@ function main(): void {
   check(
     "an invented variable is refused",
     !isTemplateVariable("user.password") &&
-      !isTemplateVariable("process.env.RESEND_API_KEY"),
+      !isTemplateVariable("process.env.SMTP_PASS"),
   );
   check(
     "an unknown variable fails validation rather than rendering blank",
@@ -615,19 +626,66 @@ function main(): void {
 
   /**
    * THE honesty check. §"Email template types" forbids pretending an automation
-   * exists. A trigger marked `wired` must be reachable from a real caller, and
-   * one marked unwired must not be — verified against the source rather than
-   * against the claim.
+   * exists.
+   *
+   * This used to assert only that a wired trigger MAPPED to an event in
+   * `EVENT_TO_TRIGGER` — which every trigger does by construction, so the check
+   * passed while six triggers claimed to be wired with no caller anywhere in
+   * the codebase. A test that cannot fail is worse than no test: it converts an
+   * unexamined claim into an apparently-verified one.
+   *
+   * So the source is scanned. A trigger is wired if and only if some file in
+   * `eventCallSites` raises an event that maps to it. Both directions are
+   * asserted, because the failure that actually happened was an over-claim.
    */
+  /**
+   * An event counts as raised when some file BOTH calls the communication
+   * service AND names that event as a string literal.
+   *
+   * Two conditions rather than one because not every caller passes a literal
+   * directly to `emitCommunicationEvent`. `validation-events.ts` dispatches
+   * through a shared `raise()` helper, so the literal appears at `raise(...)`
+   * and at the helper's parameter type instead — matching only
+   * `emitCommunicationEvent("X"` would report four genuinely-wired triggers as
+   * unwired, which is the same class of lie in the other direction.
+   *
+   * The known limit, stated rather than papered over: a file that calls the
+   * service and merely MENTIONS an unrelated event name in a string would count
+   * it as raised. That is a much smaller hole than the one this replaced — a
+   * check that could not fail at all — and it still catches the failure that
+   * actually occurred, where six triggers claimed wiring and no file named them
+   * anywhere.
+   */
+  const raisedEvents = new Set(
+    COMMUNICATION_EVENTS.filter((event) =>
+      eventCallSites.some(
+        (source) =>
+          source.includes("emitCommunicationEvent(") &&
+          (source.includes(`"${event}"`) || source.includes(`'${event}'`)),
+      ),
+    ),
+  );
+  const raisedTriggers = new Set(
+    [...raisedEvents].map((event) => EVENT_TO_TRIGGER[event]),
+  );
+
+  check(
+    "something actually raises at least one event",
+    raisedEvents.size > 0,
+    [...raisedEvents].join(", "),
+  );
+
   for (const trigger of EMAIL_TRIGGERS) {
-    const status = TRIGGER_STATUS[trigger];
-    if (!status.wired) continue;
-    const event = COMMUNICATION_EVENTS.find(
-      (candidate) => EVENT_TO_TRIGGER[candidate] === trigger,
-    );
+    const claimed = TRIGGER_STATUS[trigger].wired;
+    const actual = raisedTriggers.has(trigger);
     check(
-      `'${trigger}' claims to be wired and maps to a real event`,
-      event !== undefined,
+      `'${trigger}' wiring claim matches the source`,
+      claimed === actual,
+      claimed === actual
+        ? ""
+        : claimed
+          ? "claims wired, but no call site raises it"
+          : "is raised in the source but claims to be unwired",
     );
   }
   check(
@@ -657,8 +715,66 @@ function main(): void {
   );
   check(
     "a missing provider is SKIPPED, not FAILED",
-    /skipped: true/.test(service) && /PROVIDER_NOT_CONFIGURED/.test(service),
+    /skipped: true/.test(mailer) && /PROVIDER_NOT_CONFIGURED/.test(mailer),
     "'we chose not to send' and 'we tried and failed' are different facts",
+  );
+  check(
+    "and the service still turns that into a SKIPPED log rather than a send",
+    /delivery\.skipped \? "SKIPPED"/.test(code(service)),
+    "the distinction is worthless if it stops at the transport",
+  );
+
+  // =========================================================================
+  // MAIL TRANSPORT
+  //
+  // Delivery is SMTP through a mailbox the business owns. The properties that
+  // matter are the ones whose absence is invisible until production: a
+  // credential in a log, and a request hanging on a wedged mail server.
+  // =========================================================================
+
+  check(
+    "the SMTP password is read in exactly one module",
+    (() => {
+      const others = [service, provisioning, ideaRoute, bookingRoute].join("");
+      return /SMTP_PASS/.test(mailer) && !/SMTP_PASS/.test(others);
+    })(),
+  );
+  check(
+    "the transport never logs the credential or the raw provider error",
+    !/console\.(error|log|warn)\([^)]*(config\.pass|SMTP_PASS|error)/.test(
+      code(mailer),
+    ),
+    "an SMTP error can quote the server response, which may echo the envelope",
+  );
+  check(
+    "every connection stage is bounded by a timeout",
+    /connectionTimeout:/.test(code(mailer)) &&
+      /greetingTimeout:/.test(code(mailer)) &&
+      /socketTimeout:/.test(code(mailer)),
+    "notifyNewLead is awaited inside a public form POST",
+  );
+  check(
+    "the transport never throws — a failed email must not fail the business fact",
+    !/throw new/.test(code(mailer)),
+  );
+  check(
+    "port 465 uses implicit TLS and is not silently downgraded",
+    /secure: config\.port === IMPLICIT_TLS_PORT/.test(code(mailer)),
+  );
+  check(
+    "the envelope sender falls back to the authenticated mailbox",
+    /\|\|\s*user;/.test(code(mailer)),
+    "Hostinger rejects a From that does not match the authenticated user",
+  );
+  check(
+    "an auth failure is reported as a fixable setting, not an outage",
+    /SMTP_AUTH_FAILED/.test(mailer) && /EAUTH/.test(mailer),
+  );
+  check(
+    "no third-party email API remains",
+    !/api\.resend\.com|sendgrid|postmark|mailgun|brevo/i.test(
+      [mailer, service, read("lib/leads/notify.ts")].join("\n"),
+    ),
   );
   check(
     "the log never stores the message body",

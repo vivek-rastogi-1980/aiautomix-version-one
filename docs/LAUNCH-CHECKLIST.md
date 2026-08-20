@@ -48,7 +48,7 @@ Optional:
 | Variable | Effect if unset |
 | --- | --- |
 | `OPENAI_MODEL` | defaults to `gpt-4o-mini` |
-| `RESEND_API_KEY` | no lead email; leads still persist |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | no email; leads still persist, sends log as SKIPPED |
 | `LEAD_NOTIFICATION_EMAIL` | defaults to `contact@aiautomix.com` |
 | `LEAD_NOTIFICATION_FROM` | defaults to Resend's shared sender |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | analytics disabled entirely |
@@ -113,8 +113,11 @@ Each of these is checkable from a browser once the domain is live.
 
 - [ ] Google Search Console — verify the `www` property, submit the sitemap
 - [ ] GA4 — create the property, set `NEXT_PUBLIC_GA_MEASUREMENT_ID`
-- [ ] Resend — verify your sending domain and move
-      `LEAD_NOTIFICATION_FROM` off the shared `onboarding@resend.dev`
+- [ ] SMTP — confirm the Hostinger mailbox sends and receives, and that
+      `TRANSACTIONAL_EMAIL_FROM` names a real mailbox on the authenticated
+      domain (a mismatch is rejected by the server, not by the app)
+- [ ] SPF and DKIM — publish the records Hostinger lists for the domain, or
+      mail will send successfully and still land in spam
 - [ ] Validate the JSON-LD at `search.google.com/test/rich-results`
 
 ---

@@ -15,6 +15,7 @@ import {
   getGtmStats,
   getExecutionStats,
 } from "@/features/admin/research-ops";
+import { getFunnelStats } from "@/features/admin/leads";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
 import { Card } from "@/components/ui/card";
@@ -47,6 +48,7 @@ export default async function AdminDashboard() {
     financials,
     marketing,
     execution,
+    funnel,
     failures,
     workspaces,
     credits,
@@ -60,6 +62,9 @@ export default async function AdminDashboard() {
     getFinancialStats(),
     getGtmStats(),
     getExecutionStats(),
+    // Gated inside the RPC per block, so a role without `leads.read` gets an
+    // object missing those keys rather than an error or a zero.
+    getFunnelStats(),
     has("ai.read") ? recentFailures(6) : Promise.resolve([]),
     has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
     has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
@@ -94,6 +99,27 @@ export default async function AdminDashboard() {
   const executionNum = (key: string): number | null => {
     const value = execution?.[key];
     return typeof value === "number" ? value : null;
+  };
+
+  const funnelNum = (key: string): number | null => {
+    const value = funnel?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  /**
+   * A conversion rate, or null.
+   *
+   * Null when either side is unavailable AND when the denominator is zero.
+   * `0 / 0` is not "0%" — it is "nothing has entered this stage yet", and
+   * printing 0% next to an empty funnel reads as a collapse in conversion
+   * rather than an absence of traffic.
+   */
+  const rate = (numerator: string, denominator: string): string | null => {
+    const top = funnelNum(numerator);
+    const bottom = funnelNum(denominator);
+    if (top === null || bottom === null) return null;
+    if (bottom === 0) return "—";
+    return `${((top / bottom) * 100).toFixed(1)}%`;
   };
 
   const requests = num("ai_requests");
@@ -201,6 +227,120 @@ export default async function AdminDashboard() {
           Active users are not shown: the platform records no session or
           last-seen data, so the metric cannot be measured without inventing a
           definition. Sprint 8 candidate.
+        </p>
+      </section>
+
+      {/* --- Client funnel --------------------------------------------------
+          Counted by `admin_funnel_stats` in SQL rather than by reducing over a
+          PostgREST page: a JavaScript total over a capped result set is a
+          plausible-looking wrong number, which is worse than no number. */}
+      <section aria-label="Client funnel" className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+            Client funnel
+          </h2>
+          {has("leads.read") ? (
+            <Link
+              href="/admin/leads"
+              className="text-sm text-accent hover:underline"
+            >
+              All leads →
+            </Link>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Total leads"
+            value={funnelNum("total_leads")}
+            sub={
+              funnelNum("new_leads") !== null
+                ? `${funnelNum("new_leads")} not yet contacted`
+                : undefined
+            }
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Accounts activated"
+            value={funnelNum("accounts_created")}
+            sub="Leads that followed the activation link"
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Validated ideas"
+            value={funnelNum("validated_ideas")}
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Reports viewed"
+            value={funnelNum("reports_viewed")}
+            sub={
+              funnelNum("reports_downloaded") !== null
+                ? `${funnelNum("reports_downloaded")} downloaded`
+                : undefined
+            }
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Sessions booked"
+            value={funnelNum("sessions_booked")}
+            sub={
+              funnelNum("sessions_completed") !== null
+                ? `${funnelNum("sessions_completed")} completed`
+                : undefined
+            }
+            unavailableNote="Requires bookings.read"
+          />
+          <Stat
+            label="Qualified leads"
+            value={funnelNum("qualified_leads")}
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Customers"
+            value={funnelNum("customers")}
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Emails sent"
+            value={funnelNum("emails_sent")}
+            sub={
+              funnelNum("emails_failed") !== null
+                ? `${funnelNum("emails_failed")} failed`
+                : undefined
+            }
+            unavailableNote="Requires communications.read"
+          />
+        </div>
+
+        {/* --- Conversion between stages -------------------------------- */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Lead → activated"
+            value={rate("accounts_created", "total_leads")}
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Activated → validated"
+            value={rate("validated_ideas", "accounts_created")}
+            unavailableNote="Requires leads.read"
+          />
+          <Stat
+            label="Report → session booked"
+            value={rate("sessions_booked", "reports_viewed")}
+            unavailableNote="Requires leads.read and bookings.read"
+          />
+          <Stat
+            label="Session → qualified"
+            value={rate("qualified_leads", "sessions_completed")}
+            unavailableNote="Requires leads.read and bookings.read"
+          />
+        </div>
+
+        <p className="mt-3 text-xs text-muted-strong">
+          Stage counts come from the lead timeline, so a stage only appears once
+          something writes the event for it. Where nothing in this release
+          raises an event — report views and downloads are not yet instrumented
+          — the count stays at zero rather than being estimated from a proxy.
         </p>
       </section>
 
