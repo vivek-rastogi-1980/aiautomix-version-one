@@ -283,9 +283,7 @@ function classify(error: unknown): { code: string; message: string } {
  * reaching here, and none of them may turn a saved record into a failed request
  * because mail did not go out.
  */
-export async function sendMail(
-  message: MailMessage,
-): Promise<DeliveryResult> {
+export async function sendMail(message: MailMessage): Promise<DeliveryResult> {
   const config = settings();
 
   if (!config) {

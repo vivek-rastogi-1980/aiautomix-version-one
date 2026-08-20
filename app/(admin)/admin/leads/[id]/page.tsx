@@ -202,9 +202,7 @@ export default async function AdminLeadDetailPage({
                 <code className="font-mono text-xs">bookings.read</code>.
               </p>
             ) : bookings.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">
-                No session booked yet.
-              </p>
+              <p className="mt-2 text-sm text-muted">No session booked yet.</p>
             ) : (
               <div className="mt-3 divide-y divide-line">
                 {bookings.map((booking) => {
@@ -286,8 +284,7 @@ export default async function AdminLeadDetailPage({
                         {log.subject ?? log.trigger ?? "—"}
                       </p>
                       <p className="text-xs text-muted">
-                        {formatDateTime(log.created_at)} →{" "}
-                        {log.recipient_email}
+                        {formatDateTime(log.created_at)} → {log.recipient_email}
                       </p>
                       {log.error_message ? (
                         <p className="mt-0.5 text-xs text-muted-strong">
@@ -318,9 +315,7 @@ export default async function AdminLeadDetailPage({
                 <div className="mt-3">
                   <LeadStatusControl
                     leadId={lead.id}
-                    current={
-                      isLeadStatus(lead.status) ? lead.status : "NEW"
-                    }
+                    current={isLeadStatus(lead.status) ? lead.status : "NEW"}
                   />
                 </div>
               </Card>

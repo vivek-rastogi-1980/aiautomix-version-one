@@ -141,7 +141,9 @@ export interface LeadDetail {
  * reads `auth.users`, and no column on any of these tables holds a password, a
  * token or a provider credential.
  */
-export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
+export async function getLeadDetail(
+  leadId: string,
+): Promise<LeadDetail | null> {
   const supabase = await createClient();
 
   const { data: lead } = await supabase

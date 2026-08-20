@@ -194,10 +194,9 @@ export default async function AdminBookingsPage({
 
       <Card className="mt-6 p-5">
         <p className="text-sm text-muted">
-          Cancelling raises <code className="font-mono text-xs">
-            BOOKING_CANCELLED
-          </code>
-          , which sends an email only if a template for that trigger is active.
+          Cancelling raises{" "}
+          <code className="font-mono text-xs">BOOKING_CANCELLED</code>, which
+          sends an email only if a template for that trigger is active.
           Confirming and completing send nothing — there is no template that
           says anything a customer needs at those moments, and wiring one that
           did nothing would only look like a feature.

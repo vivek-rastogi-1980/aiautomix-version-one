@@ -189,8 +189,8 @@ export default async function AdminLeadsPage({
       {!has("leads.update") ? (
         <p className="mt-6 text-sm text-muted">
           You can read leads but not change them. Moving a lead through the
-          lifecycle needs <code className="font-mono text-xs">leads.update</code>
-          .
+          lifecycle needs{" "}
+          <code className="font-mono text-xs">leads.update</code>.
         </p>
       ) : null}
     </>

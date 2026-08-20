@@ -762,8 +762,7 @@ function main(): void {
       // The bodies are dollar-quoted in the migration; validate each one.
       const blocks = contentMigration.match(/\$q\$[\s\S]*?\$q\$/g) ?? [];
       return (
-        blocks.length > 0 &&
-        blocks.every((block) => validateTemplate(block).ok)
+        blocks.length > 0 && blocks.every((block) => validateTemplate(block).ok)
       );
     })(),
   );

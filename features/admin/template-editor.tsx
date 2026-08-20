@@ -367,7 +367,9 @@ export function TemplateEditor({
                 <button
                   type="button"
                   onClick={sendTest}
-                  disabled={pending || currentVersion < 1 || !testTo.includes("@")}
+                  disabled={
+                    pending || currentVersion < 1 || !testTo.includes("@")
+                  }
                   className="rounded-full border border-line-strong px-4 py-2 text-sm font-medium text-foreground hover:bg-fill-3 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {pending ? "Sending…" : "Send test"}
