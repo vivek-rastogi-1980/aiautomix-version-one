@@ -454,7 +454,31 @@ type BusinessPlanSectionUpdate = Partial<
 
 // --- Lead capture (migration 0005) ------------------------------------------
 
-export type LeadStatus = "new" | "contacted" | "qualified" | "archived";
+/**
+ * The lead lifecycle.
+ *
+ * Migration 0005 defined four lower-case states; migration 0019 replaced that
+ * constraint with the eight upper-case stages the funnel actually moves
+ * through, and migrated the existing rows in the same statement
+ * (`archived` became `LOST`, which is what it had meant).
+ *
+ * The lower-case names are gone from the database — the check constraint would
+ * now reject them — so they are gone from here too. Leaving them in the union
+ * would let TypeScript bless an assignment Postgres refuses at runtime, which
+ * is the worst of both worlds.
+ */
+export const LEAD_STATUSES = [
+  "NEW",
+  "CONTACTED",
+  "QUALIFIED",
+  "STRATEGY_BOOKED",
+  "STRATEGY_COMPLETED",
+  "PROPOSAL",
+  "CUSTOMER",
+  "LOST",
+] as const;
+
+export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export type Lead = {
   id: string;

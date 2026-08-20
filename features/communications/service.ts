@@ -2,11 +2,18 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import {
+  PROVIDER_ID,
+  mailerConfigured,
+  sendMail,
+  type DeliveryResult,
+} from "@/features/communications/mailer";
+import {
   EVENT_TO_TRIGGER,
   type CommunicationEvent,
   type EmailTrigger,
 } from "@/features/communications/events";
 import {
+  PREVIEW_CONTEXT,
   renderTemplate,
   validateTemplate,
   type TemplateContext,
@@ -32,20 +39,14 @@ import {
  * are different facts and support needs to tell them apart.
  *
  * ---------------------------------------------------------------------------
- * Delivery is UNVERIFIED in this release
+ * The provider lives in `mailer.ts`
  * ---------------------------------------------------------------------------
- * `RESEND_API_KEY` is not configured in this environment. Everything below runs
- * and logs, and the provider call returns SKIPPED rather than SENT. Nothing in
- * this codebase has been observed to deliver a message to a real inbox.
+ * Delivery is SMTP through the business's own Hostinger mailbox. Nothing in
+ * this file knows that: it renders a message and hands it over. The envelope
+ * sender, the credentials, the timeouts and the error vocabulary are all the
+ * mailer's business, which is what made replacing the previous HTTP provider a
+ * change to one module rather than to every send path.
  */
-
-const PROVIDER_ID = "resend";
-
-/** Where transactional mail comes from. Overridable per environment. */
-const FROM_ADDRESS =
-  process.env.TRANSACTIONAL_EMAIL_FROM ??
-  process.env.LEAD_NOTIFICATION_FROM ??
-  "AIAutoMix <onboarding@resend.dev>";
 
 export interface SendContext {
   /** Filled into the template. Only keys in the closed vocabulary are used. */
@@ -159,74 +160,23 @@ async function record(args: {
 }
 
 /**
- * Hand a rendered message to the provider.
+ * Hand a rendered message to the transport.
  *
- * Kept behind one function so a future provider swap touches nothing else, and
- * so the "unconfigured" path is in exactly one place. An absent API key is a
- * supported state, not an error — the site runs without it and the log says
- * SKIPPED rather than pretending.
+ * Kept as its own function even though it is now a thin adapter: it is the one
+ * place that decides what the send paths below see, so the "unconfigured"
+ * result and the shape of a failure stay in a single spot rather than being
+ * re-derived at each call site.
+ *
+ * An absent SMTP configuration is a supported state, not an error — the site
+ * runs without it and the log says SKIPPED rather than pretending.
  */
 async function deliver(
   to: string,
   subject: string,
   html: string,
   text: string | null,
-): Promise<
-  | { ok: true; messageId: string | null }
-  | { ok: false; code: string; message: string; skipped?: boolean }
-> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return {
-      ok: false,
-      code: "PROVIDER_NOT_CONFIGURED",
-      message:
-        "No email provider is configured, so nothing was sent. Set RESEND_API_KEY to enable delivery.",
-      skipped: true,
-    };
-  }
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_ADDRESS,
-        to: [to],
-        subject,
-        html,
-        ...(text ? { text } : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      // The provider's body may echo the recipient; the status code is enough
-      // for support and carries nothing personal into the log.
-      return {
-        ok: false,
-        code: `PROVIDER_${response.status}`,
-        message: `The email provider rejected the message (HTTP ${response.status}).`,
-      };
-    }
-
-    const payload = (await response.json()) as { id?: unknown };
-    return {
-      ok: true,
-      messageId: typeof payload?.id === "string" ? payload.id : null,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      code: "NETWORK_ERROR",
-      message:
-        error instanceof Error
-          ? error.message.slice(0, 300)
-          : "The provider could not be reached.",
-    };
-  }
+): Promise<DeliveryResult> {
+  return sendMail({ to, subject, html, text });
 }
 
 /**
@@ -361,7 +311,165 @@ export async function emitCommunicationEvent(
   return sendTemplatedEmail(EVENT_TO_TRIGGER[event], context);
 }
 
-/** Is a provider configured at all? Surfaced in the admin UI, never the key. */
+/**
+ * Send an admin test of one specific template version.
+ *
+ * Deliberately NOT `sendTemplatedEmail`. Four things have to be different, and
+ * every one of them is a rule from §"Send test email":
+ *
+ *   1. It renders the template the admin is LOOKING AT, resolved by id, rather
+ *      than whichever template is ACTIVE for that trigger. Testing a draft you
+ *      cannot see is not a test, and it is drafts that need testing.
+ *
+ *   2. It fills from `PREVIEW_CONTEXT` — obviously fictional sample data. A
+ *      test must never carry a real customer's business idea or score into an
+ *      operator's inbox.
+ *
+ *   3. The subject is prefixed `[TEST]`, so a message that reaches a shared
+ *      inbox cannot be mistaken for something a customer received.
+ *
+ *   4. It raises no event, writes no `lead_events` row and attaches to no lead
+ *      or booking. The log row carries `is_test = true`, which is what keeps
+ *      test sends out of the delivery list and out of the funnel counters.
+ *
+ * Like every other path here it returns a result and never throws.
+ */
+export async function sendTemplateTest(
+  templateId: string,
+  recipientEmail: string,
+): Promise<SendResult> {
+  const supabase = await createClient();
+
+  const { data: template } = await supabase
+    .from("email_templates")
+    .select("id, trigger, current_version")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!template || template.current_version < 1) {
+    return {
+      status: "FAILED",
+      logId: null,
+      trigger: (template?.trigger ?? "GENERAL_NOTIFICATION") as EmailTrigger,
+      subject: null,
+      messageId: null,
+      reason:
+        "Save a subject and body for this template before sending a test.",
+    };
+  }
+
+  const { data: version } = await supabase
+    .from("email_template_versions")
+    .select("id, version, subject, body_html, body_text")
+    .eq("template_id", templateId)
+    .eq("version", template.current_version)
+    .maybeSingle();
+
+  if (!version) {
+    return {
+      status: "FAILED",
+      logId: null,
+      trigger: template.trigger as EmailTrigger,
+      subject: null,
+      messageId: null,
+      reason: "That version could not be read.",
+    };
+  }
+
+  const trigger = template.trigger as EmailTrigger;
+  const active: ActiveTemplate = {
+    templateId: template.id,
+    versionId: version.id,
+    version: version.version,
+    subject: version.subject,
+    bodyHtml: version.body_html,
+    bodyText: version.body_text,
+  };
+
+  const subjectCheck = validateTemplate(active.subject);
+  const bodyCheck = validateTemplate(active.bodyHtml);
+  if (!subjectCheck.ok || !bodyCheck.ok) {
+    const issues = [...subjectCheck.issues, ...bodyCheck.issues]
+      .map((issue) => issue.message)
+      .join(" ");
+    return {
+      status: "FAILED",
+      logId: null,
+      trigger,
+      subject: null,
+      messageId: null,
+      reason: issues,
+    };
+  }
+
+  const context: SendContext = {
+    recipientEmail,
+    variables: PREVIEW_CONTEXT,
+    isTest: true,
+  };
+
+  const subject = `[TEST] ${
+    renderTemplate(active.subject, PREVIEW_CONTEXT, { html: false }).output
+  }`;
+  const html = renderTemplate(active.bodyHtml, PREVIEW_CONTEXT, {
+    html: true,
+  }).output;
+  const text = active.bodyText
+    ? renderTemplate(active.bodyText, PREVIEW_CONTEXT, { html: false }).output
+    : null;
+
+  const delivery = await deliver(recipientEmail, subject, html, text);
+
+  if (delivery.ok) {
+    const logId = await record({
+      trigger,
+      status: "SENT",
+      context,
+      template: active,
+      subject,
+      messageId: delivery.messageId,
+      errorCode: null,
+      errorMessage: null,
+    });
+    return {
+      status: "SENT",
+      logId,
+      trigger,
+      subject,
+      messageId: delivery.messageId,
+      reason: null,
+    };
+  }
+
+  const status = delivery.skipped ? "SKIPPED" : "FAILED";
+  const logId = await record({
+    trigger,
+    status,
+    context,
+    template: active,
+    subject,
+    messageId: null,
+    errorCode: delivery.code,
+    errorMessage: delivery.message,
+  });
+
+  return {
+    status,
+    logId,
+    trigger,
+    subject,
+    messageId: null,
+    reason: delivery.message,
+  };
+}
+
+/**
+ * Is a provider configured at all? Surfaced in the admin UI, never the secret.
+ *
+ * Delegates rather than reading an env var directly, so there is exactly one
+ * definition of "configured" and the admin panel cannot disagree with the code
+ * that actually sends.
+ */
 export function emailProviderConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY);
+  return mailerConfigured();
 }

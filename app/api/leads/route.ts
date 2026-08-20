@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
-import { notifyNewLead } from "@/lib/leads/notify";
+import { acknowledgeLead, notifyNewLead } from "@/lib/leads/notify";
 import { rateLimit } from "@/lib/rate-limit";
 import { leadSchema } from "@/lib/validations/lead";
 import {
@@ -114,10 +114,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Awaited so a failure is logged in this request's trace, but `notifyNewLead`
-    // swallows its own errors — the lead is already committed and must not be
-    // reported as failed because an email did not go out.
-    await notifyNewLead(lead);
+    // Two emails, two audiences: the business is told a lead arrived, and the
+    // visitor is told we received it. Until this was added the visitor got
+    // nothing at all — their address was used only as the notification's
+    // reply-to, so people submitted the form and heard silence.
+    //
+    // Concurrent because they are independent; one round-trip of latency
+    // instead of two. `allSettled` because neither may affect the other, and
+    // both already swallow their own errors — this is belt and braces so a
+    // captured lead can never be reported as failed over an email.
+    //
+    // Awaited so failures land in this request's trace rather than after the
+    // response has been sent, where a serverless runtime may freeze first.
+    //
+    // When migration 0019 is applied and a template is ACTIVE, the visitor
+    // half should move to `features/communications/service.ts` for editable
+    // copy and a delivery log. See the note in `lib/leads/notify.ts`.
+    await Promise.allSettled([notifyNewLead(lead), acknowledgeLead(lead)]);
 
     return apiSuccess({ received: true }, 201);
   } catch (error) {

@@ -15,6 +15,7 @@ import {
   leadIdempotencyKey,
 } from "@/features/onboarding/provisioning";
 import { emitCommunicationEvent } from "@/features/communications/service";
+import { formatBookingSlot } from "@/features/communications/booking-format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -140,7 +141,10 @@ export async function POST(request: NextRequest) {
     // Durable write done. Everything below is best-effort.
     const invite = await inviteVisitor(input.email, "/dashboard");
 
-    const when = new Date(scheduledAt);
+    // Formatted in the visitor's own zone, not sliced out of the UTC ISO
+    // string. Slicing produced a confirmation reading "09:30, Asia/Kolkata"
+    // for a 15:00 call — wrong by the offset while looking entirely
+    // plausible, and first noticed when somebody misses the meeting.
     void emitCommunicationEvent("BOOKING_CREATED", {
       recipientEmail: input.email,
       leadId,
@@ -148,9 +152,7 @@ export async function POST(request: NextRequest) {
       variables: {
         "user.first_name": first,
         "user.email": input.email,
-        "booking.date": when.toISOString().slice(0, 10),
-        "booking.time": when.toISOString().slice(11, 16),
-        "booking.timezone": input.timezone,
+        ...formatBookingSlot(scheduledAt, input.timezone),
       },
     }).catch((sendError) => {
       logApiError("POST /api/onboarding/bookings (email)", sendError);

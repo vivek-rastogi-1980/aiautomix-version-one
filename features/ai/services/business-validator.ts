@@ -7,6 +7,11 @@ import type { BusinessValidatorReport } from "@/features/ai/schemas/business-val
 import { createClient } from "@/lib/supabase/server";
 import type { BusinessIdeaInput } from "@/lib/validations/business-idea";
 import type { BusinessIdea, ValidationReport } from "@/types/database";
+import {
+  onValidationCompleted,
+  onValidationFailed,
+  onValidationStarted,
+} from "@/features/onboarding/validation-events";
 
 /**
  * Business Validator service — the one place that turns a validated idea into a
@@ -55,6 +60,14 @@ export async function validateBusinessIdea(
     );
   }
 
+  // The idea row is committed, so the run has genuinely started. Raised as an
+  // event rather than an email call — §9 — and deliberately not awaited: the
+  // caller is waiting on a validation, not on a notification.
+  void onValidationStarted(workspaceId, {
+    ideaTitle: idea.title,
+    industry: input.industry ?? null,
+  });
+
   try {
     // 2. All AI goes through the platform — never a direct provider call. The
     //    Workflow Manager re-validates `input` against the workflow's schema;
@@ -101,6 +114,15 @@ export async function validateBusinessIdea(
       .eq("id", idea.id)
       .eq("user_id", userId);
 
+    // The report is durably stored before anything is sent, so a provider
+    // outage costs a notification and never the report.
+    void onValidationCompleted(workspaceId, {
+      ideaTitle: idea.title,
+      industry: input.industry ?? null,
+      score: data.overallScore,
+      reportId: report.id,
+    });
+
     return { idea, report, data };
   } catch (error) {
     await supabase
@@ -108,6 +130,12 @@ export async function validateBusinessIdea(
       .update({ status: "failed" })
       .eq("id", idea.id)
       .eq("user_id", userId);
+
+    void onValidationFailed(workspaceId, {
+      ideaTitle: idea.title,
+      industry: input.industry ?? null,
+    });
+
     throw error;
   }
 }

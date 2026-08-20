@@ -60,6 +60,27 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     description: "Runs, stages, failures and evidence counts.",
   },
   {
+    href: "/admin/leads",
+    label: "Leads",
+    permission: "leads.read",
+    icon: "UserPlus",
+    description: "The funnel: who asked, and where they got to.",
+  },
+  {
+    href: "/admin/bookings",
+    label: "Strategy sessions",
+    permission: "bookings.read",
+    icon: "CalendarClock",
+    description: "Requested slots and their lifecycle.",
+  },
+  {
+    href: "/admin/communications",
+    label: "Communications",
+    permission: "communications.read",
+    icon: "Mail",
+    description: "Email templates, versions and the delivery log.",
+  },
+  {
     href: "/admin/usage",
     label: "Usage",
     permission: "usage.read",
