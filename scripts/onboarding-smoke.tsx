@@ -93,6 +93,9 @@ function main(): void {
   const bookingRoute = read("app/api/onboarding/bookings/route.ts");
   const validations = read("lib/validations/onboarding.ts");
   const mailer = read("features/communications/mailer.ts");
+  const contentMigration = read(
+    "supabase/migrations/0020_email_template_content.sql",
+  );
   // Every file permitted to raise a communication event. The honesty check
   // below scans exactly these, so adding a caller elsewhere and forgetting to
   // list it here shows up as a trigger that claims to be wired and is not.
@@ -725,6 +728,74 @@ function main(): void {
   );
 
   // =========================================================================
+  // SEEDED TEMPLATE CONTENT (migration 0020)
+  //
+  // 0019 seeded template rows with no content, which meant no email could be
+  // sent AND none could be activated (the RPC refuses `current_version < 1`).
+  // 0020 writes version 1. These checks exist because a typo in seeded copy is
+  // invisible until it reaches a customer as a blank.
+  // =========================================================================
+
+  const seededPlaceholders = [
+    ...new Set(
+      (contentMigration.match(/\{\{\s*[a-z][a-z0-9_.]*\s*\}\}/g) ?? []).map(
+        (raw) => raw.replace(/[{}\s]/g, ""),
+      ),
+    ),
+  ];
+
+  check(
+    "the seeded templates actually reference variables",
+    seededPlaceholders.length >= 8,
+    seededPlaceholders.join(", "),
+  );
+  for (const placeholder of seededPlaceholders) {
+    check(
+      `seeded copy uses a real variable: {{${placeholder}}}`,
+      isTemplateVariable(placeholder),
+      "an unknown variable renders blank at send time",
+    );
+  }
+  check(
+    "every seeded template passes the same validation the send path runs",
+    (() => {
+      // The bodies are dollar-quoted in the migration; validate each one.
+      const blocks = contentMigration.match(/\$q\$[\s\S]*?\$q\$/g) ?? [];
+      return (
+        blocks.length > 0 &&
+        blocks.every((block) => validateTemplate(block).ok)
+      );
+    })(),
+  );
+  check(
+    "seeding never overwrites copy an admin has edited",
+    /if exists \([\s\S]{0,200}email_template_versions[\s\S]{0,120}continue;/.test(
+      contentMigration,
+    ),
+    "a default must never win over somebody's deliberate edit",
+  );
+  check(
+    "seeding content never changes a template's status",
+    !/update public\.email_templates[\s\S]{0,300}?set[\s\S]{0,200}?status\s*=/.test(
+      contentMigration,
+    ),
+    "a migration must not decide to start emailing customers",
+  );
+  check(
+    "provider-owned emails are left unseeded",
+    !/\('ACCOUNT_ACTIVATION',\s*\$q\$/.test(contentMigration) &&
+      !/\('PASSWORD_RESET',\s*\$q\$/.test(contentMigration),
+    "Supabase Auth sends these; content here would imply an edit that does nothing",
+  );
+  check(
+    "the migration activates nothing at all",
+    !/'ACTIVE'/.test(
+      contentMigration.slice(contentMigration.indexOf("do $seed$")),
+    ),
+    "content is a migration concern; sending is a human decision",
+  );
+
+  // =========================================================================
   // MAIL TRANSPORT
   //
   // Delivery is SMTP through a mailbox the business owns. The properties that
@@ -762,9 +833,27 @@ function main(): void {
     /secure: config\.port === IMPLICIT_TLS_PORT/.test(code(mailer)),
   );
   check(
-    "the envelope sender falls back to the authenticated mailbox",
-    /\|\|\s*user;/.test(code(mailer)),
-    "Hostinger rejects a From that does not match the authenticated user",
+    "the sender address is pinned to the authenticated mailbox",
+    (() => {
+      const source = code(mailer);
+      return (
+        /function senderFor\(/.test(source) &&
+        // The display name is kept, but the address is always SMTP_USER.
+        /<\$\{user\}>/.test(source) &&
+        /from: senderFor\(/.test(source)
+      );
+    })(),
+    "authenticating as one mailbox and sending as another is accepted at login and rejected at send",
+  );
+  check(
+    "and a mismatch is warned about rather than silently rewritten",
+    /warnOnce\(/.test(code(mailer)) &&
+      /TRANSACTIONAL_EMAIL_FROM is/.test(mailer),
+  );
+  check(
+    "the warning fires once, not once per email",
+    /warned\.has\(message\)/.test(code(mailer)),
+    "a warning on every send is a warning nobody reads",
   );
   check(
     "an auth failure is reported as a fixable setting, not an outage",

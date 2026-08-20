@@ -28,12 +28,12 @@ import nodemailer, { type Transporter } from "nodemailer";
  *   PASS    the mailbox password, set in hPanel → Emails. Not the hPanel
  *           account password.
  *
- * And the one that produces a silent, confusing failure: the envelope sender
- * must be a mailbox that actually exists on the authenticated domain. Hostinger
- * rejects a `from` that does not match the authenticated user, so `FROM_ADDRESS`
- * below falls back to `SMTP_USER` rather than to some invented default. A
- * mismatch here fails at send time with a 5xx that reads like a permissions
- * problem.
+ * And the one that produces a silent, confusing failure: the sender must BE the
+ * authenticated mailbox. Hostinger rejects a `from` that does not match
+ * `SMTP_USER`, after a successful login — so it looks like an outage rather
+ * than a typo. `senderFor` below pins the address to the authenticated mailbox
+ * and keeps only the display name, so that mistake cannot silently swallow
+ * every email.
  *
  * ---------------------------------------------------------------------------
  * Unconfigured is a supported state
@@ -100,16 +100,75 @@ function settings(): SmtpSettings | null {
   const parsedPort = Number.parseInt(process.env.SMTP_PORT ?? "", 10);
   const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 465;
 
-  // The envelope sender defaults to the authenticated mailbox, because that is
-  // the address the server will accept. An explicit override is respected —
-  // "AIAutoMix <info@aiautomix.com>" is a display name on the same mailbox, not
-  // a different one.
-  const from =
+  const configuredFrom =
     process.env.TRANSACTIONAL_EMAIL_FROM?.trim() ||
     process.env.LEAD_NOTIFICATION_FROM?.trim() ||
-    user;
+    "";
 
-  return { host, port, user, pass, from };
+  return { host, port, user, pass, from: senderFor(configuredFrom, user) };
+}
+
+/**
+ * Pin the sender address to the authenticated mailbox, keeping the display name.
+ *
+ * ---------------------------------------------------------------------------
+ * The failure this exists to prevent
+ * ---------------------------------------------------------------------------
+ * Hostinger — and every other shared host — accepts a connection, authenticates
+ * it, and THEN rejects the message if the From address is not the mailbox that
+ * authenticated. Authenticate as `contact@` and send as `info@` and you get a
+ * clean login followed by nothing arriving, which reads as "email is broken"
+ * rather than as a one-word configuration mistake.
+ *
+ * It is a genuinely easy mistake: the two settings sit in different sections of
+ * the env file and both look correct on their own.
+ *
+ * So the address is taken from `SMTP_USER` and only the display name is honoured
+ * from the configured value:
+ *
+ *   SMTP_USER=contact@aiautomix.com
+ *   TRANSACTIONAL_EMAIL_FROM=AIAutoMix <info@aiautomix.com>
+ *   →  "AIAutoMix <contact@aiautomix.com>"
+ *
+ * Rewriting rather than failing is the right trade: the alternative is refusing
+ * to send at all over a cosmetic field. But it is not done silently — the
+ * override is warned about below, and the admin panel shows the address in use.
+ *
+ * To genuinely send as a different mailbox, authenticate as that mailbox: set
+ * `SMTP_USER` to it. That is the only thing the mail server will accept, and no
+ * amount of configuration here can change it.
+ */
+function senderFor(configured: string, user: string): string {
+  if (!configured) return user;
+
+  // "Display Name <address@host>" or a bare address.
+  const match = configured.match(/^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/);
+  const displayName = match ? match[1]!.replace(/^"|"$/g, "").trim() : "";
+  const address = (match ? match[2]! : configured).trim();
+
+  if (address.toLowerCase() === user.toLowerCase()) return configured;
+
+  warnOnce(
+    `[mail] TRANSACTIONAL_EMAIL_FROM is "${address}" but SMTP_USER is "${user}". ` +
+      `The mail server only accepts the authenticated mailbox as the sender, so ` +
+      `mail is being sent as "${user}" instead. To send as "${address}", set ` +
+      `SMTP_USER to that mailbox.`,
+  );
+
+  return displayName ? `${displayName} <${user}>` : user;
+}
+
+/**
+ * Warn about a misconfiguration once, not once per email.
+ *
+ * A warning repeated on every send is a warning nobody reads, and this one
+ * fires on a path that can run hundreds of times an hour.
+ */
+const warned = new Set<string>();
+function warnOnce(message: string): void {
+  if (warned.has(message)) return;
+  warned.add(message);
+  console.warn(message);
 }
 
 /** Is the transport configured at all? Env presence only — never the value. */

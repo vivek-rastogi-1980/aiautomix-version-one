@@ -20,6 +20,8 @@
 
 import nodemailer from "nodemailer";
 
+import { mailerSender } from "@/features/communications/mailer";
+
 const IMPLICIT_TLS_PORT = 465;
 
 function main(): void {
@@ -28,10 +30,14 @@ function main(): void {
   const pass = process.env.SMTP_PASS;
   const parsedPort = Number.parseInt(process.env.SMTP_PORT ?? "", 10);
   const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 465;
-  const from =
+  // Asked of the mailer rather than re-derived, so this prints what the
+  // application will ACTUALLY send as. A second copy of the rule here is how a
+  // check script ends up confidently reporting a value the app does not use.
+  const configuredFrom =
     process.env.TRANSACTIONAL_EMAIL_FROM?.trim() ||
     process.env.LEAD_NOTIFICATION_FROM?.trim() ||
-    user;
+    "";
+  const from = mailerSender() ?? user;
 
   const recipient = process.argv[2];
 
@@ -41,6 +47,19 @@ function main(): void {
   console.log(`  user      ${user ?? "(not set)"}`);
   console.log(`  password  ${pass ? "set" : "(not set)"}`);
   console.log(`  from      ${from ?? "(not set)"}`);
+  if (configuredFrom && from && !configuredFrom.includes(addressOf(from))) {
+    console.log("");
+    console.log(
+      `  NOTE  TRANSACTIONAL_EMAIL_FROM is "${configuredFrom}", but the mail`,
+    );
+    console.log(
+      `        server only accepts the authenticated mailbox as the sender,`,
+    );
+    console.log(`        so mail is sent as "${from}" instead.`);
+    console.log(
+      `        To genuinely send as the other address, set SMTP_USER to it.`,
+    );
+  }
   console.log("");
 
   if (!host || !user || !pass) {
@@ -110,6 +129,12 @@ function main(): void {
       process.exit(1);
     }
   })();
+}
+
+/** The bare address out of "Display Name <address@host>". */
+function addressOf(sender: string): string {
+  const match = sender.match(/<\s*([^>]+)\s*>/);
+  return (match ? match[1]! : sender).trim();
 }
 
 /**
