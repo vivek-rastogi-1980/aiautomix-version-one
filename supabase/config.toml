@@ -1,0 +1,24 @@
+# Supabase CLI project configuration.
+#
+# This file is what tells the CLI "the project root is the directory ABOVE
+# supabase/". Without it the CLI resolves `supabase/migrations` relative to
+# whatever directory you happen to be standing in — so running it from inside
+# `supabase/` made it look for `supabase/supabase/migrations`, find nothing, and
+# report that the remote had migrations the local repo did not.
+#
+# That is what produced:
+#
+#   Remote migration versions not found in local migrations directory.
+#
+# The migration history was never the problem, and the `migration repair
+# --status reverted` the CLI suggested would have marked 0001-0018 as un-applied
+# against a database that already has every one of those objects.
+#
+# Always run the CLI from the repository root.
+
+project_id = "ldlsgcptbrqqlgzixkts"
+
+[db]
+# Matches the remote (17.6.1.155), so a local `supabase start` behaves like
+# production rather than on an older major.
+major_version = 17
