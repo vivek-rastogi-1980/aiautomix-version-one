@@ -81,6 +81,23 @@ in Vercel → Settings → Git.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — set exactly one |
 | `NEXT_PUBLIC_SITE_URL` | `https://www.aiautomix.com` |
 | `OPENAI_API_KEY` | AI features return 503 without it |
+| `SMTP_HOST` | `smtp.hostinger.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | The FULL mailbox address, e.g. `contact@aiautomix.com` |
+| `SMTP_PASS` | The mailbox password from hPanel → Emails |
+
+The four SMTP variables are listed as **required**, not optional, because
+without them the site does not fail — it silently stops emailing. Leads still
+save, forms still show a success message, and every send is recorded as
+SKIPPED. There is no error to notice.
+
+They live in `.env.local` for local development, and `.env.local` is NOT
+deployed. Setting them locally and testing with `npm run verify:email` proves
+nothing about production: that command reads `.env.local`. Production reads
+Vercel → Settings → Environment Variables, and nothing else.
+
+Check the live state in Admin → System health, which reports whether the
+transport is configured in the environment actually serving the request.
 
 `NEXT_PUBLIC_SITE_URL` is the one to get exactly right. Canonical URLs, the
 sitemap, `robots.txt`, Open Graph images and auth email links all derive from it.
@@ -91,9 +108,8 @@ A typo breaks password reset and email confirmation.
 | Variable | If unset |
 | --- | --- |
 | `OPENAI_MODEL` | Defaults to `gpt-4o-mini` |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | No email at all; **leads still persist** and every send logs as SKIPPED |
 | `LEAD_NOTIFICATION_EMAIL` | Defaults to `contact@aiautomix.com` |
-| `LEAD_NOTIFICATION_FROM` | Defaults to Resend's shared sender |
+| `TRANSACTIONAL_EMAIL_FROM` | Defaults to `SMTP_USER`. Must name a mailbox on the authenticated domain — the mail server rejects anything else, so only the display name is honoured if it does not match |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Analytics disabled entirely |
 
 ### Must NOT be set on Vercel
