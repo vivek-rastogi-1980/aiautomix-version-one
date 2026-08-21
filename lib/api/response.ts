@@ -16,6 +16,15 @@ export interface ApiErrorBody {
     message: string;
     /** Field-level messages for validation failures. */
     fields?: Record<string, string>;
+    /**
+     * Structured context a client needs to render a specific screen, where a
+     * message alone is not enough — an entitlement refusal, for instance,
+     * needs the usage and the limit to draw a meaningful "3 of 3 used" panel.
+     *
+     * Never carries internal detail: only values the customer can already see
+     * on their own usage page.
+     */
+    details?: Record<string, unknown>;
   };
 }
 
@@ -36,11 +45,42 @@ export function apiError(
   message: string,
   status = 400,
   fields?: Record<string, string>,
+  details?: Record<string, unknown>,
 ): NextResponse {
   return NextResponse.json<ApiErrorBody>(
-    { success: false, error: { code, message, ...(fields ? { fields } : {}) } },
+    {
+      success: false,
+      error: {
+        code,
+        message,
+        ...(fields ? { fields } : {}),
+        ...(details ? { details } : {}),
+      },
+    },
     { status },
   );
+}
+
+/**
+ * 402 for a plan limit or a feature the plan does not include.
+ *
+ * 402 Payment Required rather than 403: the caller is authenticated and
+ * authorised, and the only thing standing between them and the feature is a
+ * commercial allowance. A 403 would tell a client "you may never do this",
+ * which is wrong — next month, or one upgrade later, they may.
+ */
+export function apiEntitlementError(payload: {
+  code: string;
+  message: string;
+  feature: string;
+  reason: string;
+  used: number | null;
+  limit: number | null;
+  plan: string | null;
+  period: string;
+}): NextResponse {
+  const { code, message, ...details } = payload;
+  return apiError(code, message, 402, undefined, details);
 }
 
 /** 422 response built from a Zod failure. */

@@ -2493,6 +2493,29 @@ export interface Database {
        * than zero. Money values are decimal STRINGS — format them, never do
        * float arithmetic on them.
        */
+      /**
+       * Atomic entitlement enforcement (migration 0025). Takes NO plan, limit
+       * or usage argument: all three are resolved server-side, so a client
+       * cannot assert its own allowance.
+       */
+      entitlement_consume: {
+        Args: {
+          p_workspace_id: string;
+          p_feature: string;
+          p_idempotency_key: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Returns a reservation whose work did not happen. */
+      entitlement_release: {
+        Args: { p_idempotency_key: string };
+        Returns: Record<string, unknown>;
+      };
+      /** Plan, period and per-feature consumption for the usage panel. */
+      entitlement_usage: {
+        Args: { p_workspace_id: string };
+        Returns: Record<string, unknown>;
+      };
       admin_command_center_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, unknown>;
