@@ -12,6 +12,7 @@ import { StartResearchLink } from "@/features/research/start-research-link";
 import { StartCompetitorsLink } from "@/features/competitors/start-competitors-link";
 import { FormAlert } from "@/components/ui/form-message";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
+import { recordFunnelEvent } from "@/features/onboarding/funnel-events";
 
 export const metadata: Metadata = { title: "Validation report" };
 
@@ -25,6 +26,15 @@ export default async function ReportPage({ params }: PageProps) {
   const result = await getReport(user.id, id);
 
   if (!result) notFound();
+
+  // §19 REPORT_VIEWED. Placed AFTER `getReport` returned a row, which is the
+  // point at which the read has been authorised: `getReport` filters on
+  // `user_id` and runs under RLS, so an unauthorised request has already gone
+  // to notFound() above and records nothing.
+  //
+  // Not awaited — a customer reading their report must not wait on an
+  // analytics write, and `recordFunnelEvent` never throws.
+  void recordFunnelEvent("REPORT_VIEWED", { report_id: id });
 
   const { report: record, idea } = result;
   const title = idea?.title ?? "Business idea";

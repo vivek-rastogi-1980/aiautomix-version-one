@@ -433,6 +433,35 @@ create policy "Admins read email logs"
 -- it is the one communications action that leaves the building.
 -- ============================================================================
 
+-- ---------------------------------------------------------------------------
+-- Widen the permission CHECK before inserting into it.
+--
+-- 0008 constrained `admin_role_permissions.permission` to an enumerated list of
+-- its own fourteen permissions. A CHECK constraint does not know about future
+-- migrations, so inserting the seven added here fails with:
+--
+--   new row for relation "admin_role_permissions" violates check constraint
+--   "admin_role_permissions_permission_check"  (SQLSTATE 23514)
+--
+-- Same shape as the `leads_status_check` replacement earlier in this file:
+-- drop the old constraint, re-add it covering BOTH generations. Every value
+-- 0008 allowed is still allowed, so no existing row can be invalidated.
+-- ---------------------------------------------------------------------------
+
+alter table public.admin_role_permissions
+  drop constraint if exists admin_role_permissions_permission_check;
+
+alter table public.admin_role_permissions
+  add constraint admin_role_permissions_permission_check check (permission in (
+    -- 0008
+    'users.read','users.manage','workspaces.read','workspaces.manage',
+    'ai.read','usage.read','credits.read','credits.adjust',
+    'plans.read','plans.manage','entitlements.read','entitlements.manage',
+    'audit.read','system.read',
+    -- 0019
+    'leads.read','leads.update','bookings.read','bookings.update',
+    'communications.read','communications.write','communications.send_test'));
+
 insert into public.admin_role_permissions (role, permission) values
   ('SUPPORT',     'leads.read'),
   ('SUPPORT',     'bookings.read'),
@@ -1037,14 +1066,23 @@ set search_path = public
 as $$
 declare
   v_id uuid;
+  v_user_id uuid := p_user_id;
 begin
+  -- Same reasoning as the timeline guard below: a non-admin caller must not be
+  -- able to attribute a send to somebody else. Staff keep the supplied value
+  -- because the communication service legitimately logs on a customer's behalf.
+  if not public.admin_has('communications.read')
+     and v_user_id is distinct from auth.uid() then
+    v_user_id := auth.uid();
+  end if;
+
   insert into public.email_logs (
     template_id, template_version_id, trigger, recipient_email, user_id,
     workspace_id, lead_id, booking_id, subject, provider, provider_message_id,
     status, error_code, error_message, is_test,
     sent_at, failed_at
   ) values (
-    p_template_id, p_version_id, p_trigger, lower(btrim(p_recipient)), p_user_id,
+    p_template_id, p_version_id, p_trigger, lower(btrim(p_recipient)), v_user_id,
     p_workspace_id, p_lead_id, p_booking_id, p_subject, p_provider, p_message_id,
     p_status, p_error_code, left(coalesce(p_error_message, ''), 2000), p_is_test,
     case when p_status = 'SENT' then timezone('utc', now()) end,
@@ -1054,7 +1092,31 @@ begin
 
   -- A test send must never look like customer communication on a lead's
   -- timeline. §23 is explicit that it triggers no business automation.
-  if p_lead_id is not null and not p_is_test then
+  --
+  -- The ownership test is a security control, not tidiness. This function is
+  -- `security definer`, so it bypasses RLS, and it is granted to
+  -- `authenticated` -- which is every customer who has ever signed up. Without
+  -- this check any of them could POST to /rest/v1/rpc/email_log_record with an
+  -- arbitrary p_lead_id and write EMAIL_SENT rows onto ANY lead's timeline.
+  --
+  -- That timeline is what an admin reads to answer "what have we sent this
+  -- person?". A forgeable audit trail answers it wrongly, which is worse than
+  -- having none. So the event is written only when the caller genuinely owns
+  -- the lead, or holds the grant that lets staff work leads.
+  --
+  -- A caller who owns neither still gets their email_logs row: the log of the
+  -- attempt is harmless, and dropping it would lose real sends.
+  if p_lead_id is not null and not p_is_test
+     and (
+       public.admin_has('leads.update')
+       or exists (
+         select 1 from public.leads
+          where id = p_lead_id
+            and user_id is not null
+            and user_id = auth.uid()
+       )
+     )
+  then
     insert into public.lead_events (lead_id, event, metadata)
     values (p_lead_id, 'EMAIL_SENT',
             jsonb_build_object('trigger', p_trigger, 'status', p_status));

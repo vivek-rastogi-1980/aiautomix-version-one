@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   apiError,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/api/response";
 import { validateIdeaSchema } from "@/lib/validations/onboarding";
 import {
+  captureLead,
   inviteVisitor,
   leadIdempotencyKey,
 } from "@/features/onboarding/provisioning";
@@ -103,35 +103,41 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient();
-
     // Idempotent capture. A resubmitted form collides on the unique key and
     // returns the existing lead rather than creating a second one.
-    const { data: rows, error } = await supabase.rpc("lead_capture", {
-      p_email: input.email,
-      p_source: "idea-validation",
-      p_idempotency_key: leadIdempotencyKey(input.email, "idea-validation"),
-      p_first_name: input.firstName,
-      p_last_name: input.lastName ?? null,
-      p_phone: input.phone ?? null,
-      p_message: input.businessIdea,
-      p_industry: input.industry ?? null,
-      p_target_customer: input.targetCustomer ?? null,
-      p_target_market: input.targetMarket ?? null,
-      p_business_stage: input.businessStage ?? null,
-      p_problem_solved: input.problemSolved ?? null,
-      p_website: input.website ?? null,
-      p_landing_page: input.landingPage ?? null,
-      p_referrer: input.referrer ?? null,
-      p_utm_source: input.utmSource ?? null,
-      p_utm_medium: input.utmMedium ?? null,
-      p_utm_campaign: input.utmCampaign ?? null,
-      p_utm_term: input.utmTerm ?? null,
-      p_utm_content: input.utmContent ?? null,
+    //
+    // `captureLead` degrades to a plain insert when migration 0019 has not been
+    // applied, so a visitor is never lost to a pending deployment step. It
+    // reports which path ran; the funnel skips what genuinely cannot work yet
+    // rather than claiming otherwise.
+    const capture = await captureLead({
+      email: input.email,
+      source: "idea-validation",
+      idempotencyKey: leadIdempotencyKey(input.email, "idea-validation"),
+      firstName: input.firstName,
+      lastName: input.lastName ?? null,
+      phone: input.phone ?? null,
+      message: input.businessIdea,
+      industry: input.industry ?? null,
+      targetCustomer: input.targetCustomer ?? null,
+      targetMarket: input.targetMarket ?? null,
+      businessStage: input.businessStage ?? null,
+      problemSolved: input.problemSolved ?? null,
+      website: input.website ?? null,
+      landingPage: input.landingPage ?? null,
+      referrer: input.referrer ?? null,
+      utmSource: input.utmSource ?? null,
+      utmMedium: input.utmMedium ?? null,
+      utmCampaign: input.utmCampaign ?? null,
+      utmTerm: input.utmTerm ?? null,
+      utmContent: input.utmContent ?? null,
     });
 
-    if (error || !rows?.length) {
-      logApiError("POST /api/onboarding/validate-idea", error);
+    // `saved`, not `leadId`: the degraded path cannot read an id back, so
+    // keying off the id would report failure for a lead that was written — and,
+    // worse, report success for one that was not.
+    if (!capture.saved) {
+      logApiError("POST /api/onboarding/validate-idea", null);
       return apiError(
         "SERVER_ERROR",
         "We could not record your idea just now. Please try again.",
@@ -139,8 +145,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const leadId = rows[0].lead_id;
-    const wasExisting = rows[0].was_existing === true;
+    const leadId = capture.leadId;
+    const wasExisting = capture.wasExisting;
 
     // The durable write is done. Everything after this point is best-effort and
     // must not be able to fail the submission.

@@ -19,6 +19,21 @@ const PROTECTED_PREFIXES = [
   "/workspace",
   "/usage",
   "/diagnostics",
+  // Booking a strategy session. Without this entry the layout still refuses an
+  // anonymous visitor, but the bounce loses the destination — somebody who
+  // clicked "Book a Free AI Strategy Session" would log in and land on the
+  // dashboard, having lost what they were trying to do.
+  "/strategy-session",
+  // The product surfaces added by phases 8-10. Each is inside the (dashboard)
+  // group, so the layout already refused an anonymous visitor and no data was
+  // ever exposed — but the redirect lost `redirectTo` the same way, and the
+  // page rendered before being thrown away. Listed here so protection is
+  // declared in one place rather than inferred from a folder name.
+  "/research",
+  "/competitors",
+  "/financials",
+  "/marketing",
+  "/execution",
   // The admin area. The layout re-checks the admin role server-side and RLS
   // refuses the data regardless — this only spares an unauthenticated visitor
   // a pointless render.

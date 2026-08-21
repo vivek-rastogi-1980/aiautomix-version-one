@@ -1,6 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 
 import { getReport } from "@/features/reports/data";
+import { recordFunnelEvent } from "@/features/onboarding/funnel-events";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 import { toPdfFilename } from "@/features/ai/pdf/filename";
 import { ReportPdfDocument } from "@/features/ai/pdf/report-pdf";
@@ -61,6 +62,13 @@ export const GET = withApiAuth<{ id: string }>(
         generatedAt={`${generatedAt} UTC`}
       />,
     );
+
+    // §19 REPORT_DOWNLOADED. Recorded here, at the last possible moment: the
+    // caller is authenticated, `getReport` confirmed they own the row, and the
+    // document rendered without throwing. A 404, a 422 for an unrenderable
+    // report, or a render failure all return before this line and count
+    // nothing — §"do not count failed downloads".
+    void recordFunnelEvent("REPORT_DOWNLOADED", { report_id: id });
 
     return new Response(new Uint8Array(buffer), {
       headers: {

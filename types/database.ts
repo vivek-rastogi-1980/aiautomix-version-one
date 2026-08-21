@@ -2475,6 +2475,18 @@ export interface Database {
 
       // --- Migration 0019: client onboarding -----------------------------
       /** Funnel counters for the admin dashboard. Counted in SQL. */
+      /** Resolves the ACTIVE template for a trigger. See migration 0023. */
+      email_active_template: {
+        Args: { p_trigger: string };
+        Returns: {
+          template_id: string;
+          version_id: string;
+          version: number;
+          subject: string;
+          body_html: string;
+          body_text: string | null;
+        }[];
+      };
       admin_funnel_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;

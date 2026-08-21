@@ -165,19 +165,17 @@ export const bookingSchema = z.object({
     .default("UTC"),
 
   notes: optionalText(2000),
-  leadId: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => (value === "" ? undefined : value))
-    .refine(
-      (value) =>
-        value === undefined ||
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          value,
-        ),
-      "That reference is not valid.",
-    ),
+  // `leadId` is deliberately NOT accepted from the browser.
+  //
+  // It used to be, and `booking_create` trusted it: a caller could name any
+  // lead id and have a BOOKING_CREATED event written onto that lead's timeline
+  // and its status moved to STRATEGY_BOOKED. Admin -> Leads reads exactly those
+  // rows, so forged activity was indistinguishable from real behaviour.
+  //
+  // The server now resolves the lead itself, from the authenticated session or
+  // by capturing against the submitted email. Migration 0022 additionally
+  // refuses an unowned lead id inside the function, because the RPC is
+  // reachable directly over PostgREST and a schema is not a security boundary.
 
   company_website: optionalText(200),
 });

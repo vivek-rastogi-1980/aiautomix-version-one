@@ -99,7 +99,36 @@ export async function POST(request: NextRequest) {
     // A booking always belongs to a lead, so the pipeline sees it. When the
     // visitor already has one (they validated an idea first) the idempotent
     // capture returns it rather than creating a second.
-    let leadId = input.leadId ?? null;
+    // Resolved server-side, never taken from the request body. `lead_capture`
+    // is idempotent on (email, source), so a returning visitor collides onto
+    // their existing lead instead of creating a second one.
+    let leadId: string | null = null;
+
+    // A signed-in booker already has a lead. Reuse it.
+    //
+    // `lead_capture` keys on (source, email), so capturing here under
+    // "strategy-session" produced a SECOND lead for anybody who had already
+    // come through "idea-validation" — the same human counted twice in the
+    // funnel, split across two rows in Admin -> Leads, with the original lead
+    // left at NEW while the duplicate advanced to STRATEGY_BOOKED.
+    //
+    // Read under the caller's own RLS, so this can only find their own lead.
+    {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: existing } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        leadId = existing?.id ?? null;
+      }
+    }
 
     if (!leadId) {
       const { data: leadRows } = await supabase.rpc("lead_capture", {
