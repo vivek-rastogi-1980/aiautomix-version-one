@@ -12,6 +12,7 @@ import {
   validateBusinessIdea,
 } from "@/features/ai";
 import { getWorkspaceContext } from "@/features/workspaces/data";
+import { EntitlementError } from "@/features/commerce/errors";
 import { canEdit } from "@/features/workspaces/roles";
 import {
   type ActionState,
@@ -71,6 +72,14 @@ export async function submitBusinessIdeaAction(
     );
     reportId = outcome.report.id;
   } catch (error) {
+    // An entitlement refusal is a product outcome, not a provider fault, and it
+    // already carries copy naming the usage, the limit and what to do next.
+    // Passing it through `toAiError` would replace that with a generic "the AI
+    // service failed", which is both wrong and unactionable.
+    if (error instanceof EntitlementError) {
+      return errorState(error.message);
+    }
+
     const aiError = toAiError(error);
     console.error("[business-validator] run failed", {
       code: aiError.code,

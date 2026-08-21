@@ -11,6 +11,12 @@ import type { BusinessPlanDocument } from "@/features/ai/schemas/business-plan";
 import { toPlanSectionContents } from "@/features/business-plans/sections";
 import { createClient } from "@/lib/supabase/server";
 import type { BusinessPlanInput } from "@/lib/validations/business-plan";
+import {
+  businessPlanIdempotencyKey,
+  consumeEntitlement,
+  releaseEntitlement,
+} from "@/features/commerce/enforcement";
+import { EntitlementError } from "@/features/commerce/errors";
 import type { BusinessPlan, BusinessPlanSection } from "@/types/database";
 
 /**
@@ -36,6 +42,22 @@ export interface GeneratePlanOptions {
   input: BusinessPlanInput;
 }
 
+/**
+ * A stable fingerprint for one plan generation attempt.
+ *
+ * Derived server-side from the submission, so a retry of the same request
+ * collides with its first attempt rather than consuming a second plan from the
+ * monthly allowance.
+ */
+function planFingerprint(userId: string, input: BusinessPlanInput): string {
+  const basis = `${userId}:${input.businessName}:${input.businessIdeaId ?? ""}`;
+  let hash = 0;
+  for (let index = 0; index < basis.length; index += 1) {
+    hash = (hash * 31 + basis.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 export async function generateBusinessPlan({
   userId,
   workspaceId,
@@ -45,6 +67,33 @@ export async function generateBusinessPlan({
   const workflow = getWorkflow(BUSINESS_PLAN_WORKFLOW);
   const projectId = input.projectId ? input.projectId : null;
   const businessIdeaId = input.businessIdeaId ? input.businessIdeaId : null;
+
+  // ---------------------------------------------------------------------
+  // Entitlement, before the plan row and long before the model call.
+  //
+  // Reserved atomically: `entitlement_consume` locks this workspace's counter,
+  // compares it to the CURRENT configured limit and increments in one
+  // statement, so concurrent generations cannot both pass with one unit left.
+  // A denial therefore costs no AI spend at all.
+  //
+  // Deliberately placed above the `business_plans` INSERT. Reserving after the
+  // row exists would leave a plan record for work the customer was never
+  // entitled to start.
+  // ---------------------------------------------------------------------
+  const reservationKey = businessPlanIdempotencyKey(
+    workspaceId,
+    planFingerprint(userId, input),
+  );
+
+  const entitlement = await consumeEntitlement(
+    workspaceId,
+    "business_plan",
+    reservationKey,
+  );
+
+  if (!entitlement.allowed) {
+    throw new EntitlementError(entitlement);
+  }
 
   // 1. Record the attempt before spending a model call, so a plan that fails
   //    mid-generation is still visible and explicable to the user. The prompt
@@ -72,6 +121,9 @@ export async function generateBusinessPlan({
     .single();
 
   if (createError || !created) {
+    // Outside the try/catch below, so it needs its own release: a failed
+    // INSERT must not silently cost the customer a plan from their allowance.
+    await releaseEntitlement(reservationKey);
     throw new AiError(
       "AI_PROVIDER_ERROR",
       `Could not create the business plan: ${createError?.message ?? "unknown error"}`,
@@ -166,6 +218,10 @@ export async function generateBusinessPlan({
       .from("business_plans")
       .update({ status: "failed" })
       .eq("id", created.id);
+
+    // The generation the allowance was reserved for did not happen. Give it
+    // back, matching the success-only policy the usage counter already uses.
+    await releaseEntitlement(reservationKey);
     throw error;
   }
 }
