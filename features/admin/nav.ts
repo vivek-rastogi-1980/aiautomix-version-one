@@ -12,7 +12,29 @@ import type { AdminPermission } from "@/features/admin/permissions";
  * the read regardless. Typing the URL directly gets a redirect, not a page —
  * SPRINT-07.md: "Do not rely on hidden navigation."
  */
+/**
+ * Navigation sections.
+ *
+ * Sixteen ungrouped links is a list you scan rather than navigate. The order
+ * follows how an operator actually thinks about the platform — who the
+ * customers are, what the business is doing, what the AI cost, what we said to
+ * people, who did what, and whether anything is on fire.
+ */
+export const ADMIN_NAV_SECTIONS = [
+  "Overview",
+  "Customers",
+  "Business",
+  "AI platform",
+  "Communications",
+  "Security",
+  "System",
+] as const;
+
+export type AdminNavSection = (typeof ADMIN_NAV_SECTIONS)[number];
+
 export interface AdminNavItem {
+  /** Which group this appears under in the sidebar. */
+  section: AdminNavSection;
   href: string;
   label: string;
   /** Omit for entries every admin may see. */
@@ -25,12 +47,14 @@ export interface AdminNavItem {
 export const ADMIN_NAV: readonly AdminNavItem[] = [
   {
     href: "/admin",
+    section: "Overview",
     label: "Dashboard",
     icon: "LayoutDashboard",
     description: "Platform KPIs and recent activity.",
   },
   {
     href: "/admin/users",
+    section: "Customers",
     label: "Users",
     permission: "users.read",
     icon: "Users",
@@ -38,6 +62,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/workspaces",
+    section: "Customers",
     label: "Workspaces",
     permission: "workspaces.read",
     icon: "Building2",
@@ -45,6 +70,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/ai",
+    section: "AI platform",
     label: "AI operations",
     permission: "ai.read",
     icon: "Sparkles",
@@ -52,6 +78,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/research",
+    section: "AI platform",
     label: "Research ops",
     // The same grant that governs the research tables' admin SELECT policies in
     // migration 0009 — a role that can read the rows can read the monitoring.
@@ -61,6 +88,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/leads",
+    section: "Business",
     label: "Leads",
     permission: "leads.read",
     icon: "UserPlus",
@@ -68,6 +96,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/bookings",
+    section: "Business",
     label: "Strategy sessions",
     permission: "bookings.read",
     icon: "CalendarClock",
@@ -75,6 +104,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/communications",
+    section: "Communications",
     label: "Communications",
     permission: "communications.read",
     icon: "Mail",
@@ -82,6 +112,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/usage",
+    section: "AI platform",
     label: "Usage",
     permission: "usage.read",
     icon: "Activity",
@@ -89,6 +120,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/costs",
+    section: "AI platform",
     label: "Cost analytics",
     permission: "usage.read",
     icon: "DollarSign",
@@ -96,6 +128,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/credits",
+    section: "AI platform",
     label: "Credits",
     permission: "credits.read",
     icon: "Coins",
@@ -103,6 +136,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/plans",
+    section: "Business",
     label: "Plans",
     permission: "plans.read",
     icon: "Layers",
@@ -110,6 +144,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/entitlements",
+    section: "Business",
     label: "Entitlements",
     permission: "entitlements.read",
     icon: "ToggleRight",
@@ -117,6 +152,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/audit-logs",
+    section: "Security",
     label: "Audit logs",
     permission: "audit.read",
     icon: "ScrollText",
@@ -124,6 +160,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/system-health",
+    section: "System",
     label: "System health",
     permission: "system.read",
     icon: "HeartPulse",
@@ -131,6 +168,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
   },
   {
     href: "/admin/settings",
+    section: "Security",
     label: "Settings",
     icon: "Settings",
     description: "Your admin role and staff directory.",

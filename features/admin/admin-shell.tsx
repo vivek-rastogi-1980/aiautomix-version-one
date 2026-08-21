@@ -28,7 +28,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { AdminNavItem } from "@/features/admin/nav";
+import { ADMIN_NAV_SECTIONS, type AdminNavItem } from "@/features/admin/nav";
 import {
   ROLE_BADGE,
   ROLE_LABELS,
@@ -91,35 +91,56 @@ function NavList({
 }) {
   const pathname = usePathname();
 
-  return (
-    <nav className="flex flex-col gap-0.5" aria-label="Admin">
-      {nav.map((item) => {
-        const Icon = ICONS[item.icon] ?? LayoutDashboard;
-        // `/admin` must only match exactly, or it would highlight for every
-        // child route and the current section would be ambiguous.
-        const active =
-          item.href === "/admin"
-            ? pathname === "/admin"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  // Grouped, in the declared section order. A section with no visible items —
+  // because this role holds none of its permissions — renders nothing at all
+  // rather than an empty heading, so the sidebar reflects what this person can
+  // actually do.
+  const grouped = ADMIN_NAV_SECTIONS.map((section) => ({
+    section,
+    items: nav.filter((item) => item.section === section),
+  })).filter((group) => group.items.length > 0);
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              active
-                ? "bg-fill-4 font-medium text-foreground"
-                : "text-muted hover:bg-fill-2 hover:text-foreground",
-            )}
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="truncate">{item.label}</span>
-          </Link>
-        );
-      })}
+  return (
+    <nav className="flex flex-col gap-4" aria-label="Admin">
+      {grouped.map((group) => (
+        <div key={group.section} className="flex flex-col gap-0.5">
+          {/* The Overview group is a single link; a heading above one item is
+              noise, so it is omitted. */}
+          {group.section === "Overview" ? null : (
+            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-strong">
+              {group.section}
+            </p>
+          )}
+          {group.items.map((item) => {
+            const Icon = ICONS[item.icon] ?? LayoutDashboard;
+            // `/admin` must only match exactly, or it would highlight for every
+            // child route and the current section would be ambiguous.
+            const active =
+              item.href === "/admin"
+                ? pathname === "/admin"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-fill-4 font-medium text-foreground"
+                    : "text-muted hover:bg-fill-2 hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
