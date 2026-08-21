@@ -263,9 +263,7 @@ export interface CaptureInput {
  * broken database into silent data loss, which is the bug this exists to
  * prevent.
  */
-export async function captureLead(
-  input: CaptureInput,
-): Promise<CaptureResult> {
+export async function captureLead(input: CaptureInput): Promise<CaptureResult> {
   const supabase = await createClient();
 
   const { data: rows, error } = await supabase.rpc("lead_capture", {
@@ -332,22 +330,20 @@ export async function captureLead(
   // `INSERT ... RETURNING`, which RLS refuses — failing the whole insert with
   // 42501 and losing the lead. `POST /api/leads` has always inserted without a
   // select for exactly this reason.
-  const { error: insertError } = await supabase
-    .from("leads")
-    .insert({
-      email: input.email,
-      source: input.source,
-      name: fullName || null,
-      phone: input.phone ?? null,
-      message: input.message ?? null,
-      landing_page: input.landingPage ?? null,
-      referrer: input.referrer ?? null,
-      utm_source: input.utmSource ?? null,
-      utm_medium: input.utmMedium ?? null,
-      utm_campaign: input.utmCampaign ?? null,
-      utm_term: input.utmTerm ?? null,
-      utm_content: input.utmContent ?? null,
-    });
+  const { error: insertError } = await supabase.from("leads").insert({
+    email: input.email,
+    source: input.source,
+    name: fullName || null,
+    phone: input.phone ?? null,
+    message: input.message ?? null,
+    landing_page: input.landingPage ?? null,
+    referrer: input.referrer ?? null,
+    utm_source: input.utmSource ?? null,
+    utm_medium: input.utmMedium ?? null,
+    utm_campaign: input.utmCampaign ?? null,
+    utm_term: input.utmTerm ?? null,
+    utm_content: input.utmContent ?? null,
+  });
 
   if (insertError) {
     console.error("[onboarding] fallback lead insert failed", {

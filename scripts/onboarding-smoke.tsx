@@ -854,8 +854,7 @@ function main(): void {
   );
   check(
     "the idea form has a honeypot and sends it",
-    /website/.test(code(ideaPage)) &&
-      /company_website/.test(code(ideaSubmit)),
+    /website/.test(code(ideaPage)) && /company_website/.test(code(ideaSubmit)),
   );
   check(
     "the analytics event fires on confirmed persistence, not on click",
@@ -887,7 +886,7 @@ function main(): void {
     "the fallback insert never asks for the row back",
     (() => {
       const source = code(provisioning);
-      const start = source.indexOf("from(\"leads\")");
+      const start = source.indexOf('from("leads")');
       if (start === -1) return false;
       const block = source.slice(start, start + 900);
       // `leads` has an INSERT policy and NO SELECT policy, so a `.select()`

@@ -112,7 +112,9 @@ export async function submitIdea(
         activationSent: data.activationSent === true,
         duplicate: data.duplicate === true,
         message:
-          typeof data.message === "string" ? data.message : "We have your idea.",
+          typeof data.message === "string"
+            ? data.message
+            : "We have your idea.",
       };
     }
 

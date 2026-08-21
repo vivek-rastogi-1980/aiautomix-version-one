@@ -87,7 +87,11 @@ export default async function AdminSystemHealthPage() {
         <Stat
           label="Email transport"
           value={mailConfigured ? "Configured" : "Not configured"}
-          sub={mailConfigured ? `Sends as ${mailSender}` : "SMTP_HOST / SMTP_USER / SMTP_PASS"}
+          sub={
+            mailConfigured
+              ? `Sends as ${mailSender}`
+              : "SMTP_HOST / SMTP_USER / SMTP_PASS"
+          }
         />
         <Stat
           label="Active workflows"
@@ -115,8 +119,9 @@ export default async function AdminSystemHealthPage() {
             asks why they never got a confirmation.
           </p>
           <p className="mt-2 text-sm text-muted">
-            Setting these in <code className="font-mono text-xs">.env.local</code>{" "}
-            only affects local development —{" "}
+            Setting these in{" "}
+            <code className="font-mono text-xs">.env.local</code> only affects
+            local development —{" "}
             <code className="font-mono text-xs">.env.local</code> is not
             deployed. For production they must be set in the hosting
             provider&rsquo;s own environment settings, followed by a redeploy.
