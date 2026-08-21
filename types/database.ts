@@ -2487,6 +2487,16 @@ export interface Database {
           body_text: string | null;
         }[];
       };
+      /**
+       * Super Admin command center aggregates (migration 0024). Each block is
+       * permission-gated, so a key the caller may not see is ABSENT rather
+       * than zero. Money values are decimal STRINGS — format them, never do
+       * float arithmetic on them.
+       */
+      admin_command_center_stats: {
+        Args: { p_since?: string | null };
+        Returns: Record<string, unknown>;
+      };
       admin_funnel_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;

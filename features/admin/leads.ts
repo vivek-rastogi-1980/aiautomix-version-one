@@ -252,3 +252,109 @@ export async function getFunnelStats(): Promise<Record<
   }
   return (data as Record<string, number | string> | null) ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Command center (Phase 12)
+// ---------------------------------------------------------------------------
+
+/** One workflow's slice of AI spend. Money arrives as text, never a float. */
+export interface WorkflowUsage {
+  workflow: string;
+  requests: number;
+  failures: number;
+  tokens: number;
+  /** Decimal string. Format it; never do arithmetic on it in JavaScript. */
+  cost: string;
+}
+
+/**
+ * Aggregates for the Super Admin command center.
+ *
+ * Backed by `admin_command_center_stats` (migration 0024), which counts
+ * everything in SQL and gates each block on its own permission. A key the
+ * caller may not see is ABSENT from the object rather than zero, and the `Stat`
+ * component turns that into "Unavailable" — because `0 leads` and `you cannot
+ * see leads` are different facts and an operator acting on the wrong one makes
+ * a bad decision.
+ *
+ * Returns null on error, which the page also renders as unavailable. A metrics
+ * failure must not take the admin panel down during the incident it is there
+ * to help diagnose.
+ */
+export async function getCommandCenterStats(): Promise<Record<
+  string,
+  unknown
+> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_command_center_stats", {
+    p_since: null,
+  });
+
+  if (error) {
+    console.error("[admin] command center stats unavailable", error.message);
+    return null;
+  }
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+/** The funnel, in journey order, with drop-off between consecutive stages. */
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count: number | null;
+  /** Percentage of the FIRST stage that reached this one. */
+  ofTop: number | null;
+  /** Percentage lost between the previous stage and this one. */
+  dropOff: number | null;
+}
+
+const FUNNEL_ORDER: { key: string; label: string }[] = [
+  { key: "stage_lead_created", label: "Lead created" },
+  { key: "stage_idea_submitted", label: "Idea submitted" },
+  { key: "stage_account_activated", label: "Account activated" },
+  { key: "stage_validated", label: "Validation completed" },
+  { key: "stage_report_viewed", label: "Report viewed" },
+  { key: "stage_report_downloaded", label: "Report downloaded" },
+  { key: "stage_cta_clicked", label: "Strategy CTA clicked" },
+  { key: "stage_booking_created", label: "Booking created" },
+  { key: "stage_booking_completed", label: "Session completed" },
+];
+
+/**
+ * Shape the raw counters into an ordered funnel.
+ *
+ * Percentages are computed here rather than in SQL because they are pure
+ * presentation of numbers the database already produced — no row is loaded to
+ * derive them. Division by zero yields null, not 0%: an empty funnel has no
+ * conversion rate, and printing 0% would read as a collapse rather than an
+ * absence of traffic.
+ */
+export function buildFunnel(
+  stats: Record<string, unknown> | null,
+): FunnelStage[] {
+  const value = (key: string): number | null => {
+    const raw = stats?.[key];
+    return typeof raw === "number" ? raw : null;
+  };
+
+  const top = value(FUNNEL_ORDER[0]!.key);
+
+  return FUNNEL_ORDER.map((stage, index) => {
+    const count = value(stage.key);
+    const previous = index === 0 ? null : value(FUNNEL_ORDER[index - 1]!.key);
+
+    return {
+      key: stage.key,
+      label: stage.label,
+      count,
+      ofTop:
+        count !== null && top !== null && top > 0
+          ? Math.round((count / top) * 1000) / 10
+          : null,
+      dropOff:
+        count !== null && previous !== null && previous > 0
+          ? Math.round((1 - count / previous) * 1000) / 10
+          : null,
+    };
+  });
+}
