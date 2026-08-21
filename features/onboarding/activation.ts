@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import {
   claimLeadForCurrentUser,
@@ -40,6 +41,126 @@ import { getOrigin } from "@/lib/site";
  * here keeps exactly one way for a workspace to come into existence.
  */
 
+/** The user's own lead, for when the claim was made on an earlier visit. */
+async function existingLeadId(userId: string): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record a lead event only if that event is not already on the timeline.
+ *
+ * `lead_events` is append-only by design, so nothing removes a duplicate once
+ * written. The check is a read rather than a constraint because the table
+ * legitimately holds repeats of most events — a customer can view a report
+ * many times — and only the once-per-lifetime ones are deduplicated here.
+ */
+async function recordLeadEventOnce(
+  leadId: string,
+  event: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("lead_events")
+      .select("id")
+      .eq("lead_id", leadId)
+      .eq("event", event)
+      .limit(1)
+      .maybeSingle();
+    if (data) return;
+  } catch {
+    // Unreadable timeline: fall through and record. A duplicate row is a
+    // smaller problem than a missing one.
+  }
+  await recordLeadEvent(leadId, event, metadata);
+}
+
+/**
+ * Turn the captured lead into a real business idea the product can work on.
+ *
+ * Created as `draft`, NOT `processing`. Running the validator here would spend
+ * AI credits on a redirect, outside the entitlement checks the validator's own
+ * entry points apply — the cost-control rule the funnel was built around. The
+ * dashboard shows the idea and offers the validation action; the spend stays a
+ * decision somebody makes.
+ *
+ * Idempotent on the lead: if `leads.business_idea_id` is already set, this does
+ * nothing, so a second activation cannot create a second idea.
+ */
+async function createIdeaFromLead(
+  leadId: string,
+  workspaceId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+
+    const { data: lead } = await supabase
+      .from("leads")
+      .select(
+        "message, industry, target_customer, target_market, business_stage, problem_solved, business_idea_id",
+      )
+      .eq("id", leadId)
+      .maybeSingle();
+
+    if (!lead || lead.business_idea_id) return;
+
+    const text = (lead.message ?? "").trim();
+    if (text.length === 0) return;
+
+    // The first sentence makes a readable title; the full text is kept in the
+    // payload so a later validation run has everything the visitor wrote.
+    const title = (text.split(/(?<=[.!?])\s/)[0] ?? text).slice(0, 120).trim();
+
+    const { data: idea } = await supabase
+      .from("business_ideas")
+      .insert({
+        user_id: userId,
+        workspace_id: workspaceId,
+        project_id: null,
+        title: title || "Business idea",
+        payload_json: {
+          businessName: title,
+          description: text,
+          industry: lead.industry ?? "",
+          targetCustomer: lead.target_customer ?? "",
+          targetMarket: lead.target_market ?? "",
+          businessStage: lead.business_stage ?? "",
+          problemSolved: lead.problem_solved ?? "",
+          source: "idea-validation-funnel",
+        },
+        status: "draft",
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (idea?.id) {
+      await supabase
+        .from("leads")
+        .update({ business_idea_id: idea.id })
+        .eq("id", leadId);
+    }
+  } catch (error) {
+    // The account and workspace are real either way.
+    console.error("[onboarding] could not create idea from lead", {
+      message: error instanceof Error ? error.message : error,
+    });
+  }
+}
+
 export interface ActivationResult {
   workspaceId: string | null;
   leadId: string | null;
@@ -59,14 +180,32 @@ export async function completeActivation(): Promise<ActivationResult> {
     // Matching by email is not authorisation: the caller is authenticated by
     // `auth.uid()`, and they have just proven control of the address by
     // following a one-time link sent to it.
-    const { leadId } = await claimLeadForCurrentUser(workspace.id);
+    // `lead_claim_for_user` only matches an UNCLAIMED lead, so it returns null
+    // on a second activation. That is correct for claiming, but it used to skip
+    // everything below with it — meaning a re-activation did no work at all and
+    // a lead claimed before the idea step existed could never acquire one.
+    // Falling back to the already-claimed lead makes activation idempotent
+    // rather than merely safe to repeat.
+    const { leadId: claimedId } = await claimLeadForCurrentUser(workspace.id);
+    const leadId = claimedId ?? (await existingLeadId(user.id));
 
     if (leadId) {
-      // Fire-and-forget by contract — analytics must never fail a user action.
-      await recordLeadEvent(leadId, "ACCOUNT_CREATED", {});
-      await recordLeadEvent(leadId, "WORKSPACE_CREATED", {
+      // Idempotent: activation can legitimately run more than once (a link
+      // followed twice, a refresh), and a timeline that says the account was
+      // created three times is a timeline an admin stops trusting.
+      await recordLeadEventOnce(leadId, "ACCOUNT_CREATED", {});
+      await recordLeadEventOnce(leadId, "WORKSPACE_CREATED", {
         workspace_id: workspace.id,
       });
+
+      // Carry the submitted idea into the product.
+      //
+      // Without this the visitor activates, lands on the dashboard, and is
+      // asked to "submit your business idea" — the exact thing they just did.
+      // The capture form writes to `leads`; nothing was moving it into
+      // `business_ideas`, which is what the dashboard, the validator and the
+      // report engine all read.
+      await createIdeaFromLead(leadId, workspace.id, user.id);
     }
 
     // Raised as an EVENT, not composed here: which template answers

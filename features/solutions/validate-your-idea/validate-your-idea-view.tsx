@@ -2,6 +2,9 @@
 
 import { Fragment, useRef } from "react";
 import Link from "next/link";
+
+import { submitIdea } from "@/lib/leads/submit-idea";
+import { trackEvent } from "@/lib/analytics/events";
 import { asStyle } from "@/lib/styles";
 import { useMergedState } from "@/hooks/use-merged-state";
 import { SiteNav } from "@/components/layout/site-nav";
@@ -24,10 +27,15 @@ body { margin: 0; background: #0A0B0F; }
 
 const INITIAL_STATE = {
   ideaText: "",
-  form: { name: "", email: "", industry: "", idea: "" },
+  // `website` is the honeypot: never rendered, so a human always leaves it
+  // empty and a naive bot fills it. Kept in form state so the existing field
+  // setters work on it unchanged.
+  form: { name: "", email: "", industry: "", idea: "", website: "" },
   nameError: "",
   emailError: "",
   submitted: false,
+  submitError: "",
+  submitMessage: "",
   faqOpenIdx: null as number | null,
 };
 type PageState = typeof INITIAL_STATE;
@@ -330,6 +338,8 @@ class ValidateYourIdeaController {
       onField_industry: fieldSetter("industry"),
       onField_idea: fieldSetter("idea"),
       submitted: this.state.submitted,
+      submitError: this.state.submitError,
+      submitMessage: this.state.submitMessage,
       submit: () => {
         const f = this.state.form;
         const nameErr = f.name.trim() ? "" : "Please enter your name.";
@@ -339,11 +349,56 @@ class ValidateYourIdeaController {
             ? ""
             : "Please enter a valid email address."
           : "Please enter your email.";
-        if (nameErr || emailErr) {
-          this.setState({ nameError: nameErr, emailError: emailErr });
+        const ideaErr = f.idea.trim().length >= 10;
+        if (nameErr || emailErr || !ideaErr) {
+          this.setState({
+            nameError: nameErr,
+            emailError: emailErr,
+            submitError: ideaErr
+              ? ""
+              : "Please describe your idea in a little more detail.",
+          });
           return;
         }
-        this.setState({ submitted: true, nameError: "", emailError: "" });
+
+        // Optimistic: the confirmation shows immediately, then the submission
+        // is persisted. Until this was wired the handler stopped HERE — it set
+        // `submitted` and sent nothing, so every visitor saw "Your validation
+        // is running" and their idea was discarded. The success state is now
+        // provisional and is corrected if the request actually fails.
+        this.setState({
+          submitted: true,
+          nameError: "",
+          emailError: "",
+          submitError: "",
+        });
+
+        void submitIdea(
+          {
+            name: f.name,
+            email: f.email,
+            industry: f.industry,
+            idea: f.idea,
+          },
+          f.website,
+        ).then((result) => {
+          if (result.ok) {
+            // Fired on confirmed persistence rather than on click: an event
+            // counting attempts instead of captured leads overstates the
+            // conversion rate. Carries no field values.
+            trackEvent("idea_validator_started", {
+              source: "validate-your-idea-page",
+            });
+            this.setState({ submitMessage: result.message });
+            return;
+          }
+          // Reopen the form with the error rather than leaving the visitor
+          // believing a lost submission was received.
+          this.setState({
+            submitted: false,
+            submitError: result.message,
+          });
+        });
       },
     };
   }
@@ -383,6 +438,8 @@ export function ValidateYourIdeaView() {
     onField_industry,
     onField_idea,
     submitted,
+    submitError,
+    submitMessage,
     submit,
   } = usePageVals();
 
@@ -907,9 +964,19 @@ export function ValidateYourIdeaView() {
                 <p
                   style={{ fontSize: "14.5px", color: "#8A87A0", margin: "0" }}
                 >
-                  {"We'll email your free score and full report to "}
+                  {submitMessage
+                    ? submitMessage
+                    : "We're saving your idea — one moment."}
+                </p>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "#6E6B85",
+                    margin: "10px 0 0",
+                  }}
+                >
+                  {"Sent to "}
                   {form.email}
-                  {" shortly."}
                 </p>
               </div>
             ) : null}
@@ -998,6 +1065,18 @@ export function ValidateYourIdeaView() {
                 >
                   {"Get my free score →"}
                 </div>
+                {submitError ? (
+                  <p
+                    role="alert"
+                    style={{
+                      fontSize: "13.5px",
+                      color: "#FF8B8B",
+                      margin: "10px 0 0",
+                    }}
+                  >
+                    {submitError}
+                  </p>
+                ) : null}
                 <p
                   style={{
                     fontSize: "12.5px",

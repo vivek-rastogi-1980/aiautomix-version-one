@@ -90,31 +90,36 @@ async function loadActiveTemplate(
 ): Promise<ActiveTemplate | null> {
   const supabase = await createClient();
 
-  const { data: template } = await supabase
-    .from("email_templates")
-    .select("id, current_version")
-    .eq("trigger", trigger)
-    .eq("status", "ACTIVE")
-    .maybeSingle();
+  // Through a `security definer` RPC, not a direct select.
+  //
+  // `email_templates` is admin-read-only under RLS, and this runs as whoever
+  // triggered the send — `anon` for a public form, the customer for a
+  // validation. A direct select therefore returned nothing for almost every
+  // real send, and the service logged SKIPPED / NO_ACTIVE_TEMPLATE, which is
+  // indistinguishable from "nobody has activated a template". Migration 0023
+  // adds the reader; it returns the ACTIVE version only, never a draft.
+  const { data, error } = await supabase.rpc("email_active_template", {
+    p_trigger: trigger,
+  });
 
-  if (!template || template.current_version < 1) return null;
+  if (error) {
+    console.error("[communications] template lookup failed", {
+      trigger,
+      message: error.message,
+    });
+    return null;
+  }
 
-  const { data: version } = await supabase
-    .from("email_template_versions")
-    .select("id, version, subject, body_html, body_text")
-    .eq("template_id", template.id)
-    .eq("version", template.current_version)
-    .maybeSingle();
-
-  if (!version) return null;
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
 
   return {
-    templateId: template.id,
-    versionId: version.id,
-    version: version.version,
-    subject: version.subject,
-    bodyHtml: version.body_html,
-    bodyText: version.body_text,
+    templateId: row.template_id,
+    versionId: row.version_id,
+    version: row.version,
+    subject: row.subject,
+    bodyHtml: row.body_html,
+    bodyText: row.body_text,
   };
 }
 

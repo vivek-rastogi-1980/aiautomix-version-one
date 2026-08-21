@@ -93,6 +93,19 @@ function main(): void {
   const bookingRoute = read("app/api/onboarding/bookings/route.ts");
   const validations = read("lib/validations/onboarding.ts");
   const mailer = read("features/communications/mailer.ts");
+  const ideaPage = read(
+    "features/solutions/validate-your-idea/validate-your-idea-view.tsx",
+  );
+  const ideaSubmit = read("lib/leads/submit-idea.ts");
+  const funnelEvents = read("features/onboarding/funnel-events.ts");
+  const funnelData = read("features/dashboard/funnel-data.ts");
+  const ideaPanel = read("features/dashboard/idea-panel.tsx");
+  const bookingForm = read("features/onboarding/booking-form.tsx");
+  const reportPage = read("app/(dashboard)/reports/[id]/page.tsx");
+  const pdfRoute = read("app/api/reports/[id]/pdf/route.tsx");
+  const ownershipMigration = read(
+    "supabase/migrations/0022_booking_lead_ownership.sql",
+  );
   const contentMigration = read(
     "supabase/migrations/0020_email_template_content.sql",
   );
@@ -435,10 +448,18 @@ function main(): void {
       `the ${name} route commits durably before attempting email`,
       (() => {
         const source = code(route);
-        const rpc = source.indexOf("supabase.rpc(");
+        // The durable write is either the RPC directly, or `captureLead`, which
+        // wraps it and adds the fallback for a database without 0019 applied.
+        // Either way it must come BEFORE any attempt to send mail.
+        const persist = [
+          source.indexOf("supabase.rpc("),
+          source.indexOf("captureLead("),
+        ].filter((index) => index !== -1);
         // The CALL site, not the import above it.
         const email = source.indexOf("void emitCommunicationEvent(");
-        return rpc !== -1 && email !== -1 && rpc < email;
+        return (
+          persist.length > 0 && email !== -1 && Math.min(...persist) < email
+        );
       })(),
       "a provider outage must cost a notification, never the lead",
     );
@@ -598,7 +619,20 @@ function main(): void {
   check("a test send is flagged in the log", /is_test/.test(migration));
   check(
     "and never writes to a lead's timeline",
-    /if p_lead_id is not null and not p_is_test then/.test(migration),
+    (() => {
+      // Asserts the PROPERTY, not one spelling of it. The guard grew a second
+      // clause when `email_log_record` was hardened against timeline forgery;
+      // matching the old single-line condition would have failed a function
+      // that had become stricter, which is the wrong direction for a test to
+      // push.
+      const start = migration.indexOf(
+        "create or replace function public.email_log_record(",
+      );
+      const body = migration.slice(start, start + 5000);
+      const guard = body.indexOf("not p_is_test");
+      const insert = body.indexOf("insert into public.lead_events");
+      return guard !== -1 && insert !== -1 && guard < insert;
+    })(),
     "§23: a test triggers no business automation",
   );
 
@@ -795,6 +829,246 @@ function main(): void {
   );
 
   // =========================================================================
+  // THE PUBLIC FORM ACTUALLY SUBMITS
+  //
+  // The /validate-your-idea handler used to validate the fields, set
+  // `submitted: true` to render "Your validation is running", and return —
+  // sending nothing anywhere. Every visitor saw success and their idea was
+  // discarded. A form that looks like it worked is worse than one that errors.
+  // =========================================================================
+
+  check(
+    "the idea form posts its submission somewhere",
+    /submitIdea\(/.test(code(ideaPage)),
+    "a success screen with no request is a lead silently thrown away",
+  );
+  check(
+    "it posts to the funnel endpoint, not just lead capture",
+    /\/api\/onboarding\/validate-idea/.test(code(ideaSubmit)),
+    "this page promises a validation, so it needs the endpoint that provisions one",
+  );
+  check(
+    "a failed submission reopens the form instead of showing success",
+    /submitted: false/.test(code(ideaPage)) &&
+      /submitError/.test(code(ideaPage)),
+  );
+  check(
+    "the idea form has a honeypot and sends it",
+    /website/.test(code(ideaPage)) &&
+      /company_website/.test(code(ideaSubmit)),
+  );
+  check(
+    "the analytics event fires on confirmed persistence, not on click",
+    (() => {
+      const source = code(ideaPage);
+      const ok = source.indexOf("result.ok");
+      const track = source.indexOf("trackEvent(");
+      return ok !== -1 && track !== -1 && ok < track;
+    })(),
+    "counting attempts rather than captures overstates conversion",
+  );
+
+  // =========================================================================
+  // LEAD CAPTURE IS NEVER LOST
+  // =========================================================================
+
+  check(
+    "capture degrades to a direct insert when the RPC is missing",
+    /PGRST202/.test(code(provisioning)),
+    "a pending migration must not cost a real lead",
+  );
+  check(
+    "only a MISSING FUNCTION degrades — other errors stay failures",
+    /missingFunction/.test(code(provisioning)) &&
+      /if \(!missingFunction\)/.test(code(provisioning)),
+    "a fallback that swallows every error turns a broken database into data loss",
+  );
+  check(
+    "the fallback insert never asks for the row back",
+    (() => {
+      const source = code(provisioning);
+      const start = source.indexOf("from(\"leads\")");
+      if (start === -1) return false;
+      const block = source.slice(start, start + 900);
+      // `leads` has an INSERT policy and NO SELECT policy, so a `.select()`
+      // makes it INSERT ... RETURNING, which RLS refuses with 42501 — failing
+      // the insert and losing the lead.
+      return !/\.select\(/.test(block);
+    })(),
+    "INSERT ... RETURNING is denied by RLS and takes the whole insert with it",
+  );
+  check(
+    "success is reported from `saved`, not from a lead id",
+    /saved: boolean/.test(provisioning) &&
+      /!capture\.saved/.test(code(ideaRoute)),
+    "the degraded path cannot read an id back, so a null id is not a failure",
+  );
+
+  // =========================================================================
+  // P8/P9 — CUSTOMER DASHBOARD
+  // =========================================================================
+
+  check(
+    "the dashboard reads validation state from the idea row, not a guess",
+    /idea\.status/.test(code(funnelData)) &&
+      /"PENDING"|"RUNNING"|"COMPLETED"|"FAILED"/.test(code(funnelData)),
+  );
+  check(
+    "completed-without-a-report is reported as still running",
+    /return report \? "COMPLETED" : "RUNNING"/.test(code(funnelData)),
+    "offering a View report button that 404s teaches the customer the product is broken",
+  );
+  check(
+    "the score is read from the stored report, never derived",
+    /report\.score/.test(code(ideaPanel)) &&
+      !/Math\.(random|round|floor)\s*\(/.test(code(ideaPanel)),
+    "§8: do not invent scores",
+  );
+  check(
+    "report actions render only when a report row exists",
+    /\{report \? \(/.test(ideaPanel),
+    "§8: do not display actions that are not currently available",
+  );
+  check(
+    "every dashboard read is scoped to the caller",
+    (() => {
+      const source = code(funnelData);
+      const selects = (source.match(/\.from\(/g) ?? []).length;
+      const scoped = (source.match(/\.eq\("user_id", userId\)/g) ?? []).length;
+      return selects > 0 && scoped >= 3;
+    })(),
+  );
+
+  // =========================================================================
+  // P19 — FUNNEL EVENTS FIRE ON ACTIONS, NOT RENDERS
+  // =========================================================================
+
+  check(
+    "REPORT_VIEWED is recorded only after authorisation succeeded",
+    (() => {
+      const source = code(reportPage);
+      const guard = source.indexOf("if (!result) notFound();");
+      const event = source.indexOf('recordFunnelEvent("REPORT_VIEWED"');
+      return guard !== -1 && event !== -1 && guard < event;
+    })(),
+    "an unauthorised or missing report must count nothing",
+  );
+  check(
+    "REPORT_DOWNLOADED is recorded only after the PDF actually rendered",
+    (() => {
+      const source = code(pdfRoute);
+      const render = source.indexOf("renderToBuffer(");
+      const event = source.indexOf('recordFunnelEvent("REPORT_DOWNLOADED"');
+      return render !== -1 && event !== -1 && render < event;
+    })(),
+    "§19: do not count failed downloads",
+  );
+  check(
+    "STRATEGY_CTA_CLICKED fires from a click handler, not a render",
+    (() => {
+      const cta = read("features/dashboard/strategy-cta.tsx");
+      return /onClick=/.test(cta) && /recordStrategyCtaClick/.test(cta);
+    })(),
+  );
+  check(
+    "BOOKING_STARTED fires when the booking workflow opens",
+    /useEffect\(/.test(code(bookingForm)) &&
+      /recordBookingStarted/.test(code(bookingForm)),
+  );
+  check(
+    "BOOKING_CREATED and BOOKING_COMPLETED come from the database, not the UI",
+    /'BOOKING_CREATED'/.test(ownershipMigration) &&
+      /'BOOKING_COMPLETED'/.test(migration),
+    "one writer per fact, so the UI cannot disagree with the record",
+  );
+  check(
+    "funnel events never throw into a user action",
+    !/throw /.test(code(funnelEvents)),
+  );
+  check(
+    "a funnel event cannot be written onto someone else's lead",
+    /lead_record_event/.test(code(funnelEvents)) &&
+      !/p_lead_id: [a-z]*Id \|\| /.test(code(funnelEvents)),
+    "the lead is resolved from auth.uid(), never accepted from the client",
+  );
+
+  // =========================================================================
+  // P11 — BOOKING IDENTITY AND DUPLICATION
+  // =========================================================================
+
+  check(
+    "the booking form posts no identity fields",
+    !/user_id|workspace_id|leadId|lead_id/.test(code(bookingForm)),
+    "§BOOKING SECURITY: the browser must not name the actor",
+  );
+  check(
+    "the request schema no longer accepts a lead id",
+    !/^\s*leadId: z/m.test(code(validations)),
+    "it was trusted end-to-end and allowed timeline forgery",
+  );
+  check(
+    "the route derives the lead server-side",
+    /let leadId: string \| null = null/.test(code(bookingRoute)),
+  );
+  check(
+    "booking_create refuses an unowned lead id (migration 0022)",
+    /v_lead_id/.test(ownershipMigration) &&
+      /admin_has\('leads\.update'\)/.test(ownershipMigration) &&
+      /lower\(btrim\(email\)\) = v_email/.test(ownershipMigration),
+    "the RPC is reachable over PostgREST, so a schema is not the boundary",
+  );
+  check(
+    "0022 uses v_lead_id everywhere, never the raw parameter, after the check",
+    (() => {
+      const body = ownershipMigration.slice(
+        ownershipMigration.indexOf("insert into public.bookings"),
+      );
+      return !/p_lead_id/.test(body);
+    })(),
+  );
+  check(
+    "the submit button is disabled while a booking is in flight",
+    /disabled=\{!canSubmit\}/.test(code(bookingForm)) &&
+      /!pending/.test(code(bookingForm)),
+  );
+  check(
+    "booking failure shows friendly copy, never a provider message",
+    /select another available time/.test(bookingForm) &&
+      !/error\.message/.test(code(bookingForm)),
+  );
+
+  // =========================================================================
+  // MIDDLEWARE — protection is declared, not inferred
+  //
+  // Every one of these lives in the (dashboard) group, so the layout refused an
+  // anonymous visitor even before they were listed. What was missing was the
+  // `redirectTo`: somebody who clicked through to a protected page logged in
+  // and landed on the dashboard, having lost what they were doing.
+  // =========================================================================
+
+  const middlewareSource = code(read("lib/supabase/middleware.ts"));
+  for (const route of [
+    "/strategy-session",
+    "/research",
+    "/competitors",
+    "/financials",
+    "/marketing",
+    "/execution",
+    "/dashboard",
+    "/reports",
+    "/admin",
+  ]) {
+    check(
+      `'${route}' is an explicitly protected prefix`,
+      new RegExp(`"${route}"`).test(middlewareSource),
+    );
+  }
+  check(
+    "the bounce preserves the intended destination",
+    /searchParams\.set\("redirectTo", pathname\)/.test(middlewareSource),
+  );
+
+  // =========================================================================
   // MAIL TRANSPORT
   //
   // Delivery is SMTP through a mailbox the business owns. The properties that
@@ -811,7 +1085,7 @@ function main(): void {
   );
   check(
     "the transport never logs the credential or the raw provider error",
-    !/console\.(error|log|warn)\([^)]*(config\.pass|SMTP_PASS|error)/.test(
+    !/console\.(error|log|warn)\([^)]*(config\.pass|SMTP_PASS|error\b)/.test(
       code(mailer),
     ),
     "an SMTP error can quote the server response, which may echo the envelope",
@@ -937,23 +1211,61 @@ function main(): void {
     ROLE_PERMISSIONS.SUPPORT.includes("communications.read") &&
       !ROLE_PERMISSIONS.SUPPORT.includes("communications.send_test"),
   );
+  /**
+   * Every mutating RPC must consult SOMETHING before it writes.
+   *
+   * This used to check a hardcoded list of three function names. It passed
+   * while `email_log_record` — `security definer`, granted to `authenticated`,
+   * and therefore callable by every customer who has ever signed up — wrote to
+   * `email_logs` and `lead_events` with no authorization check at all. Any of
+   * them could have forged EMAIL_SENT rows onto any lead's timeline.
+   *
+   * A test named "every" that inspects three is not a weaker test, it is a
+   * misleading one: it converts an unexamined function into an apparently
+   * verified one. So the list is now DERIVED from the migration. A new function
+   * is covered the moment it is written, without anyone remembering to add it.
+   */
+  const mutatingFunctions = [
+    ...migration.matchAll(/create or replace function public\.(\w+)\(/g),
+  ]
+    .map((match) => match[1]!)
+    .filter((name) => {
+      const start = migration.indexOf(
+        `create or replace function public.${name}(`,
+      );
+      const body = migration.slice(start, start + 4000);
+      // Read-only functions have nothing to authorize at write time.
+      return /\binsert into\b|\bupdate public\.|\bdelete from\b/.test(body);
+    });
+
   check(
-    "every mutating RPC checks a permission or an identity",
+    "the migration actually defines mutating functions to check",
+    mutatingFunctions.length >= 8,
+    mutatingFunctions.join(", "),
+  );
+
+  for (const fn of mutatingFunctions) {
+    const start = migration.indexOf(`create or replace function public.${fn}(`);
+    const body = migration.slice(start, start + 5000);
+    check(
+      `'${fn}' consults a permission or an identity before writing`,
+      /admin_has\(|auth\.uid\(\)|is_admin\(/.test(body),
+      "security definer bypasses RLS, so the function is the only gate left",
+    );
+  }
+
+  check(
+    "email_log_record cannot forge a timeline entry for someone else's lead",
     (() => {
-      const fns = [
-        "lead_set_status",
-        "email_template_save",
-        "email_template_set_status",
-      ];
-      return fns.every((fn) => {
-        const start = migration.indexOf(
-          `create or replace function public.${fn}`,
-        );
-        if (start === -1) return false;
-        const body = migration.slice(start, start + 2500);
-        return /admin_has\(/.test(body);
-      });
+      const start = migration.indexOf(
+        "create or replace function public.email_log_record(",
+      );
+      const body = migration.slice(start, start + 5000);
+      const guard = body.indexOf("admin_has('leads.update')");
+      const insert = body.indexOf("insert into public.lead_events");
+      return guard !== -1 && insert !== -1 && guard < insert;
     })(),
+    "the guard must precede the write, not follow it",
   );
 
   // =========================================================================
