@@ -1068,6 +1068,110 @@ function main(): void {
   );
 
   // =========================================================================
+  // ONE PERSON, ONE LEAD  (migration 0027)
+  //
+  // lead_capture resolved an existing lead only by idempotency_key, and that
+  // key embeds the source. So validating an idea and later booking a session
+  // produced TWO leads for one human: counted twice in the funnel, listed
+  // twice in Admin -> Leads, with the original stuck at NEW while the
+  // duplicate advanced. Verified against the live database before the fix.
+  // =========================================================================
+
+  const identityMigration = read(
+    "supabase/migrations/0027_one_person_one_lead.sql",
+  );
+
+  check(
+    "capture resolves an existing lead by EMAIL, not just the idempotency key",
+    /lower\(btrim\(email\)\) = v_email/.test(identityMigration),
+    "the person is the identity; the source is how they arrived",
+  );
+  check(
+    "the exact-retry check still runs first",
+    (() => {
+      const key = identityMigration.indexOf("where idempotency_key = p_idempotency_key");
+      const email = identityMigration.indexOf("lower(btrim(email)) = v_email");
+      return key !== -1 && email !== -1 && key < email;
+    })(),
+    "a genuine retry is more specific than a returning visitor",
+  );
+  check(
+    "the oldest lead wins, because it carries the history",
+    /order by created_at\s+limit 1/.test(identityMigration),
+  );
+  check(
+    "a later submission fills gaps but never erases known data",
+    /coalesce\(p_phone, phone\)/.test(identityMigration) &&
+      /coalesce\(p_industry, industry\)/.test(identityMigration),
+    "somebody who omits a field on a second visit keeps what they gave on the first",
+  );
+  check(
+    "first-touch attribution survives a second entry point",
+    !/set[\s\S]{0,400}source\s*=\s*coalesce\(p_source/.test(
+      identityMigration,
+    ),
+    "rewriting source on a later booking destroys where the customer came from",
+  );
+  check(
+    "existing duplicates are not silently merged by the migration",
+    !/delete from public\.leads/.test(identityMigration),
+    "merging real customer records is a judgement call, not a migration",
+  );
+
+  // =========================================================================
+  // MANDATORY PASSWORD SETUP  (migration 0026)
+  // =========================================================================
+
+  const passwordMigration = read(
+    "supabase/migrations/0026_password_setup_required.sql",
+  );
+  const authActions = read("features/auth/actions.ts");
+  const dashboardLayout = read("app/(dashboard)/layout.tsx");
+
+  check(
+    "the schema still stores no password, hash or token",
+    !/password\s+text|encrypted|hash|token/i.test(
+      passwordMigration.replace(/^\s*--.*$/gm, ""),
+    ),
+    "the flag is a boolean, not a credential",
+  );
+  check(
+    "no default flips existing customers into forced setup",
+    /default false/.test(passwordMigration),
+  );
+  check(
+    "every dashboard route is gated, via the shared layout",
+    /password_setup_required/.test(code(dashboardLayout)) &&
+      /redirect\("\/change-password"\)/.test(code(dashboardLayout)),
+    "a per-page check would be one forgotten page away from a hole",
+  );
+  check(
+    "the flag is cleared only AFTER the password is actually set",
+    (() => {
+      const source = code(authActions);
+      const from = source.indexOf("completePasswordSetupAction");
+      const body = source.slice(from);
+      const update = body.indexOf("auth.updateUser(");
+      const clear = body.indexOf("password_setup_required: false");
+      return update !== -1 && clear !== -1 && update < clear;
+    })(),
+    "clearing first would strand somebody with no password and no prompt",
+  );
+  check(
+    "the password is never logged",
+    !/console\.(log|error|warn)\([^)]*password[^)]*parsed/i.test(
+      code(authActions),
+    ),
+  );
+  check(
+    "still no generated or emailed credential anywhere in onboarding",
+    !/temporary_password|generatePassword|randomPassword/i.test(
+      featureSources + routes.join("\n") + code(authActions),
+    ),
+    "the magic-link design is intact; this phase added a setup gate, not a credential",
+  );
+
+  // =========================================================================
   // MAIL TRANSPORT
   //
   // Delivery is SMTP through a mailbox the business owns. The properties that
