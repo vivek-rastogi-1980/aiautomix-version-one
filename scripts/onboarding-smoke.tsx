@@ -1089,7 +1089,9 @@ function main(): void {
   check(
     "the exact-retry check still runs first",
     (() => {
-      const key = identityMigration.indexOf("where idempotency_key = p_idempotency_key");
+      const key = identityMigration.indexOf(
+        "where idempotency_key = p_idempotency_key",
+      );
       const email = identityMigration.indexOf("lower(btrim(email)) = v_email");
       return key !== -1 && email !== -1 && key < email;
     })(),
@@ -1107,9 +1109,7 @@ function main(): void {
   );
   check(
     "first-touch attribution survives a second entry point",
-    !/set[\s\S]{0,400}source\s*=\s*coalesce\(p_source/.test(
-      identityMigration,
-    ),
+    !/set[\s\S]{0,400}source\s*=\s*coalesce\(p_source/.test(identityMigration),
     "rewriting source on a later booking destroys where the customer came from",
   );
   check(
