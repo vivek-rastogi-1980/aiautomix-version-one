@@ -262,6 +262,167 @@ function main(): void {
     !/drop table|alter table public\.workspaces drop/i.test(migration),
   );
 
+  // =========================================================================
+  // PHASE 13 — ATOMIC ENTITLEMENT ENFORCEMENT
+  //
+  // The catalog already described monthly limits for business validation and
+  // business plans, and a SUPER_ADMIN could edit them. Nothing read them: both
+  // features ran the AI with no quota check at all. These checks exist so that
+  // cannot silently return.
+  // =========================================================================
+
+  const readFile = (relative: string): string =>
+    readFileSync(path.join(process.cwd(), relative), "utf8");
+
+  const enforceMigration = readFile(
+    "supabase/migrations/0025_atomic_entitlement_usage.sql",
+  );
+  const validatorSource = readFile(
+    "features/ai/services/business-validator.ts",
+  );
+  const planSource = readFile("features/ai/services/business-plan.ts");
+  const enforcementSource = readFile("features/commerce/enforcement.ts");
+
+  // --- No hard-coded limits ------------------------------------------------
+  for (const [source, name] of [
+    [enforceMigration, "migration 0025"],
+    [validatorSource, "the validator"],
+    [planSource, "the plan service"],
+    [enforcementSource, "the enforcement module"],
+  ] as const) {
+    check(
+      name + " hard-codes no plan limit",
+      !/LIMIT_(FREE|STARTER|GROWTH)|(FREE|STARTER|GROWTH)_[A-Z_]*LIMIT/.test(
+        source,
+      ),
+      "limits live in plan_entitlements and nowhere else",
+    );
+  }
+  check(
+    "the limit is read from plan_entitlements on every call",
+    /from public[.]plan_entitlements/.test(enforceMigration) &&
+      !/materialized view/i.test(enforceMigration),
+    "a cached limit would ignore an admin edit until the next deploy",
+  );
+
+  // --- Atomicity -----------------------------------------------------------
+  check(
+    "the counter row is locked before the limit comparison",
+    (() => {
+      const lock = enforceMigration.indexOf("for update");
+      const compare = enforceMigration.indexOf("v_used >= v_limit");
+      return lock !== -1 && compare !== -1 && lock < compare;
+    })(),
+    "check-then-act lets two concurrent requests both pass",
+  );
+  check(
+    "the ledger has a unique idempotency key",
+    /idempotency_key text not null unique/.test(enforceMigration),
+    "a retry must collide rather than consume a second unit",
+  );
+
+  // --- AI never runs after a denial ----------------------------------------
+  for (const [source, name] of [
+    [validatorSource, "validation"],
+    [planSource, "business plan"],
+  ] as const) {
+    check(
+      name + " reserves entitlement BEFORE calling the AI",
+      (() => {
+        // The CALL site, not the import at the top of the file — `runWorkflow`
+        // appears as an import long before anything executes, so matching the
+        // bare name compares the wrong two positions and always fails.
+        const consume = source.indexOf("consumeEntitlement(");
+        const run = source.indexOf("await runWorkflow");
+        return consume !== -1 && run !== -1 && consume < run;
+      })(),
+      "a denial must prevent the spend, not report on it",
+    );
+    check(
+      name + " throws EntitlementError when refused",
+      /throw new EntitlementError[(]/.test(source),
+    );
+    check(
+      name + " releases the reservation when the run fails",
+      (source.match(/releaseEntitlement[(]/g) ?? []).length >= 2,
+      "including the path that throws before the try/catch",
+    );
+  }
+
+  // --- Nothing is trusted from the client ----------------------------------
+  check(
+    "entitlement_consume accepts no plan, limit or usage argument",
+    (() => {
+      const from = enforceMigration.indexOf(
+        "create or replace function public.entitlement_consume",
+      );
+      const sig = enforceMigration.slice(from, from + 400);
+      return (
+        /p_workspace_id/.test(sig) &&
+        /p_feature/.test(sig) &&
+        !/p_plan|p_limit|p_used|p_usage/.test(sig)
+      );
+    })(),
+    "a client that can assert its own allowance has none",
+  );
+  check(
+    "the plan is resolved from subscriptions inside the function",
+    /from public[.]subscriptions/.test(enforceMigration),
+  );
+  check(
+    "membership is verified before allowance is spent",
+    (() => {
+      const guard = enforceMigration.indexOf("is_workspace_member");
+      const spend = enforceMigration.indexOf("set used = used + 1");
+      return guard !== -1 && spend !== -1 && guard < spend;
+    })(),
+    "otherwise one workspace could spend another's quota",
+  );
+  check(
+    "anon cannot execute the enforcement functions",
+    /revoke all on function public[.]entitlement_consume[\s\S]{0,90}from anon/.test(
+      enforceMigration,
+    ),
+  );
+  check(
+    "usage tables have no write policy for any client role",
+    !/on public[.]usage_counters for (insert|update|delete)/i.test(
+      enforceMigration,
+    ),
+    "the security definer functions are the only supported writer",
+  );
+
+  // --- Refund policy -------------------------------------------------------
+  check(
+    "release marks the ledger rather than deleting it",
+    /set state = 'released'/.test(enforceMigration) &&
+      !/delete from public[.]usage_reservations/.test(enforceMigration),
+    "what was attempted must stay visible",
+  );
+  check(
+    "a release can never drive the counter negative",
+    /greatest[(]used - 1, 0[)]/.test(enforceMigration),
+  );
+
+  // --- Period --------------------------------------------------------------
+  check(
+    "the period reuses the existing calendar-month definition",
+    /date_trunc[(]'month'/.test(enforceMigration),
+  );
+
+  // --- Structured refusal --------------------------------------------------
+  check(
+    "a refusal returns structured context, not just a message",
+    /'used', v_used/.test(enforceMigration) &&
+      /'limit', v_limit/.test(enforceMigration) &&
+      /'reason', 'limit_reached'/.test(enforceMigration),
+  );
+  check(
+    "a transport failure denies rather than opening up",
+    /reason: "unavailable"/.test(enforcementSource),
+    "failing open is worst exactly when load is highest",
+  );
+
   // --- Report ---------------------------------------------------------------
   console.log(results.join("\n"));
   const total = results.length;

@@ -6,6 +6,8 @@ import {
 import { getBusinessPlans } from "@/features/business-plans/data";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
+import { EntitlementError } from "@/features/commerce/errors";
+import { apiEntitlementError } from "@/lib/api/response";
 import {
   apiError,
   apiSuccess,
@@ -109,6 +111,14 @@ export const POST = withApiAuth(
         201,
       );
     } catch (error) {
+      // §7: a limit refusal returns structured context so the client can render
+      // "3 of 3 used this month" with an upgrade path, rather than a generic
+      // failure. Handled before `toAiError`, which would flatten it into a
+      // provider error it is not.
+      if (error instanceof EntitlementError) {
+        return apiEntitlementError(error.toPayload());
+      }
+
       const aiError = toAiError(error);
       logApiError("POST /api/business-plans", aiError);
       return apiError(aiError.code, aiError.userMessage, aiError.status);

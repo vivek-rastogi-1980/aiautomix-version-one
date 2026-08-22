@@ -42,7 +42,8 @@ import {
   containsSecret,
 } from "@/features/admin/redact";
 import { pageParams, escapeSearch, searchTerm } from "@/features/admin/query";
-import { ADMIN_NAV } from "@/features/admin/nav";
+import { ADMIN_NAV, ADMIN_NAV_SECTIONS } from "@/features/admin/nav";
+import { buildFunnel } from "@/features/admin/leads";
 
 const results: string[] = [];
 let failures = 0;
@@ -625,6 +626,99 @@ function main(): void {
       "/admin/system-health",
       "/admin/settings",
     ].every((href) => ADMIN_NAV.some((item) => item.href === href)),
+  );
+
+  // =========================================================================
+  // PHASE 12 — COMMAND CENTER
+  // =========================================================================
+
+  const commandMigration = readFileSync(
+    path.join(process.cwd(), "supabase/migrations/0024_command_center_stats.sql"),
+    "utf8",
+  );
+
+  check(
+    "every nav entry belongs to a declared section",
+    ADMIN_NAV.every((item) =>
+      (ADMIN_NAV_SECTIONS as readonly string[]).includes(item.section),
+    ),
+  );
+  check(
+    "no nav section is declared but empty",
+    ADMIN_NAV_SECTIONS.every((section) =>
+      ADMIN_NAV.some((item) => item.section === section),
+    ),
+    "an empty heading in the sidebar promises a page that is not there",
+  );
+  check(
+    "command center stats refuse a non-admin",
+    /if not public[.]is_admin[(][)][\s\S]{0,120}raise exception/.test(
+      commandMigration,
+    ),
+  );
+  check(
+    "and anon cannot execute it at all",
+    /revoke all on function public[.]admin_command_center_stats[\s\S]{0,90}from anon/.test(
+      commandMigration,
+    ),
+  );
+  for (const [blockKey, grant] of [
+    ["active_users", "users.read"],
+    ["new_leads_today", "leads.read"],
+    ["most_used_model", "ai.read"],
+    ["credits_issued", "credits.read"],
+  ] as const) {
+    check(
+      `'${blockKey}' is gated behind ${grant}`,
+      (() => {
+        const at = commandMigration.indexOf(blockKey);
+        if (at === -1) return false;
+        const before = commandMigration.slice(0, at);
+        const last = before.lastIndexOf("admin_has(");
+        return (
+          last !== -1 && commandMigration.slice(last, last + 60).includes(grant)
+        );
+      })(),
+    );
+  }
+  check(
+    "AI cost is summed as numeric and returned as text, never a float",
+    /to_char[(]/.test(commandMigration) &&
+      !/::float|::double precision/.test(commandMigration),
+    "no JavaScript floating-point arithmetic for financial totals",
+  );
+  check(
+    "funnel stages count DISTINCT leads, not events",
+    (() => {
+      const from = commandMigration.indexOf("'stage_idea_submitted'");
+      const to = commandMigration.indexOf("'stage_booking_completed'");
+      if (from === -1 || to === -1) return false;
+      const stageBlock = commandMigration.slice(from, to);
+      return !/count[(][*][)] from public[.]lead_events/.test(stageBlock);
+    })(),
+    "a customer opening a report four times is one lead, not four",
+  );
+  check(
+    "an empty funnel yields null percentages, never 0%",
+    (() => {
+      const stages = buildFunnel({ stage_lead_created: 0 });
+      return stages[0]!.count === 0 && stages[0]!.ofTop === null;
+    })(),
+    "0% next to an empty funnel reads as collapsed conversion, not no traffic",
+  );
+  check(
+    "a role that cannot see leads gets null counts, not zeros",
+    buildFunnel({}).every((stage) => stage.count === null),
+  );
+  check(
+    "drop-off is computed against the PREVIOUS stage",
+    (() => {
+      const stages = buildFunnel({
+        stage_lead_created: 100,
+        stage_idea_submitted: 40,
+      });
+      return stages[1]!.dropOff === 60 && stages[1]!.ofTop === 40;
+    })(),
   );
 
   // -------------------------------------------------------------------------

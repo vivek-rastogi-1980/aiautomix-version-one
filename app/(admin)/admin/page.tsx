@@ -15,7 +15,13 @@ import {
   getGtmStats,
   getExecutionStats,
 } from "@/features/admin/research-ops";
-import { getFunnelStats } from "@/features/admin/leads";
+import {
+  buildFunnel,
+  getCommandCenterStats,
+  getFunnelStats,
+  type WorkflowUsage,
+} from "@/features/admin/leads";
+import { FunnelPanel, WorkflowUsagePanel } from "@/features/admin/funnel-panel";
 import { isPlatformConfigured } from "@/features/ai";
 import { PageHeader, Stat, EmptyState } from "@/features/admin/ui";
 import { Card } from "@/components/ui/card";
@@ -49,6 +55,7 @@ export default async function AdminDashboard() {
     marketing,
     execution,
     funnel,
+    command,
     failures,
     workspaces,
     credits,
@@ -65,6 +72,9 @@ export default async function AdminDashboard() {
     // Gated inside the RPC per block, so a role without `leads.read` gets an
     // object missing those keys rather than an error or a zero.
     getFunnelStats(),
+    // Phase 12: aggregates the older stat RPCs do not provide — active users,
+    // today's leads, per-workflow AI spend, funnel stages. Counted in SQL.
+    getCommandCenterStats(),
     has("ai.read") ? recentFailures(6) : Promise.resolve([]),
     has("workspaces.read") ? recentWorkspaces(5) : Promise.resolve([]),
     has("credits.read") ? recentCreditActivity(6) : Promise.resolve([]),
@@ -101,25 +111,25 @@ export default async function AdminDashboard() {
     return typeof value === "number" ? value : null;
   };
 
-  const funnelNum = (key: string): number | null => {
-    const value = funnel?.[key];
+  const commandNum = (key: string): number | null => {
+    const value = command?.[key];
     return typeof value === "number" ? value : null;
   };
 
-  /**
-   * A conversion rate, or null.
-   *
-   * Null when either side is unavailable AND when the denominator is zero.
-   * `0 / 0` is not "0%" — it is "nothing has entered this stage yet", and
-   * printing 0% next to an empty funnel reads as a collapse in conversion
-   * rather than an absence of traffic.
-   */
-  const rate = (numerator: string, denominator: string): string | null => {
-    const top = funnelNum(numerator);
-    const bottom = funnelNum(denominator);
-    if (top === null || bottom === null) return null;
-    if (bottom === 0) return "—";
-    return `${((top / bottom) * 100).toFixed(1)}%`;
+  /** A text value from the command stats, or null. Money stays a string. */
+  const commandText = (key: string): string | null => {
+    const value = command?.[key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+
+  const funnelStages = buildFunnel(command);
+  const workflowUsage: WorkflowUsage[] = Array.isArray(command?.["by_workflow"])
+    ? (command["by_workflow"] as WorkflowUsage[])
+    : [];
+
+  const funnelNum = (key: string): number | null => {
+    const value = funnel?.[key];
+    return typeof value === "number" ? value : null;
   };
 
   const requests = num("ai_requests");
@@ -217,17 +227,36 @@ export default async function AdminDashboard() {
         </div>
 
         {/*
-          "Active users" appears in ADMIN-DASHBOARD-SPEC.md as
-          "where reliably measurable". It is not measurable here: nothing
-          records a session or a last-seen timestamp, so any number shown would
-          be a proxy dressed as a fact. Saying so is more useful than inventing
-          a definition an operator would later find out was arbitrary.
+          "Active users" was previously reported as unmeasurable because
+          nothing recorded a session. `auth.users.last_sign_in_at` does, so the
+          metric now has a real source — and the definition is printed with it,
+          because an unlabelled "active" invites every reader to assume a
+          different meaning.
         */}
-        <p className="mt-3 text-xs text-muted-strong">
-          Active users are not shown: the platform records no session or
-          last-seen data, so the metric cannot be measured without inventing a
-          definition. Sprint 8 candidate.
-        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Active users"
+            value={commandNum("active_users")}
+            sub="Signed in within the period"
+            unavailableNote="Requires users.read"
+          />
+          <Stat
+            label="Signed in today"
+            value={commandNum("signed_in_today")}
+            unavailableNote="Requires users.read"
+          />
+          <Stat
+            label="Never signed in"
+            value={commandNum("never_signed_in")}
+            sub="Provisioned but not yet activated"
+            unavailableNote="Requires users.read"
+          />
+          <Stat
+            label="New leads today"
+            value={commandNum("new_leads_today")}
+            unavailableNote="Requires leads.read"
+          />
+        </div>
       </section>
 
       {/* --- Client funnel --------------------------------------------------
@@ -312,39 +341,74 @@ export default async function AdminDashboard() {
           />
         </div>
 
-        {/* --- Conversion between stages -------------------------------- */}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat
-            label="Lead → activated"
-            value={rate("accounts_created", "total_leads")}
-            unavailableNote="Requires leads.read"
-          />
-          <Stat
-            label="Activated → validated"
-            value={rate("validated_ideas", "accounts_created")}
-            unavailableNote="Requires leads.read"
-          />
-          <Stat
-            label="Report → session booked"
-            value={rate("sessions_booked", "reports_viewed")}
-            unavailableNote="Requires leads.read and bookings.read"
-          />
-          <Stat
-            label="Session → qualified"
-            value={rate("qualified_leads", "sessions_completed")}
-            unavailableNote="Requires leads.read and bookings.read"
-          />
+        {/* --- The funnel itself, with drop-off ------------------------- */}
+        <div className="mt-4">
+          <FunnelPanel stages={funnelStages} />
         </div>
 
         <p className="mt-3 text-xs text-muted-strong">
-          Stage counts come from the lead timeline, so a stage only appears once
-          something writes the event for it. Where nothing in this release
-          raises an event — report views and downloads are not yet instrumented
-          — the count stays at zero rather than being estimated from a proxy.
+          Stage counts come from the lead timeline, so a stage only appears
+          once something writes its event. Leads captured before an event was
+          instrumented have no row for it and are counted at zero rather than
+          being back-filled from a proxy — which is why historical leads can
+          show a later stage without the earlier one.
         </p>
       </section>
 
-      {/* --- Product output ------------------------------------------------
+      {/* --- AI platform detail -------------------------------------------
+          The aggregates the older stat RPCs do not provide. Cost is a decimal
+          string summed as `numeric` in SQL — never float arithmetic. */}
+      {has("ai.read") ? (
+        <section aria-label="AI platform" className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+              AI platform
+            </h2>
+            <Link
+              href="/admin/costs"
+              className="text-sm text-accent hover:underline"
+            >
+              Cost analytics →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat
+              label="Most used model"
+              value={commandText("most_used_model")}
+              unavailableNote="No AI usage in period"
+            />
+            <Stat
+              label="Most used feature"
+              value={commandText("most_used_workflow")}
+              unavailableNote="No AI usage in period"
+            />
+            <Stat
+              label="Avg cost / request"
+              value={
+                commandText("avg_cost_per_request")
+                  ? `$${commandText("avg_cost_per_request")}`
+                  : null
+              }
+              sub="Provider estimate"
+              unavailableNote="No AI usage in period"
+            />
+            <Stat
+              label="AI failure rate"
+              value={
+                commandText("ai_failure_rate")
+                  ? `${commandText("ai_failure_rate")}%`
+                  : null
+              }
+              unavailableNote="No AI usage in period"
+            />
+          </div>
+          <div className="mt-4">
+            <WorkflowUsagePanel rows={workflowUsage} />
+          </div>
+        </section>
+      ) : null}
+
+      {/* --- Product output ------------------------------------------------      {/* --- Product output ------------------------------------------------
           What the platform actually produced in the period. Counted by
           `admin_research_stats` in SQL and gated per block there, so a role
           without `ai.read` sees Unavailable rather than zero. */}
