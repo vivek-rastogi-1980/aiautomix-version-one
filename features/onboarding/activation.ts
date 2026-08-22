@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import {
@@ -269,19 +271,25 @@ export async function completeActivation(): Promise<ActivationResult> {
     // USER_CREATED is `events.ts`'s business, and the copy is the admin panel's.
     // Skips silently and logs when no template is active or no provider is
     // configured — both normal states.
-    void emitCommunicationEvent("USER_CREATED", {
-      recipientEmail: user.email ?? "",
-      userId: user.id,
-      workspaceId: workspace.id,
-      leadId,
-      variables: {
-        "user.email": user.email ?? "",
-        "user.first_name": firstNameFor(user.user_metadata),
-        "workspace.name": workspace.name,
-        dashboard_url: `${origin}/dashboard`,
-      },
-    }).catch((error) => {
-      console.error("[onboarding] welcome email failed", error);
+    // Inside `after`, so the send outlives the redirect. This is the tail of
+    // `/auth/confirm`, which responds with a 307 the instant activation
+    // returns; a floating promise is cut off there on Vercel and the welcome
+    // email silently never goes out.
+    after(async () => {
+      await emitCommunicationEvent("USER_CREATED", {
+        recipientEmail: user.email ?? "",
+        userId: user.id,
+        workspaceId: workspace.id,
+        leadId,
+        variables: {
+          "user.email": user.email ?? "",
+          "user.first_name": firstNameFor(user.user_metadata),
+          "workspace.name": workspace.name,
+          dashboard_url: `${origin}/dashboard`,
+        },
+      }).catch((error) => {
+        console.error("[onboarding] welcome email failed", error);
+      });
     });
 
     return { workspaceId: workspace.id, leadId };

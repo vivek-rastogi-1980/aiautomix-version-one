@@ -14,7 +14,7 @@
  *   HONESTY    A trigger claimed as "wired" is actually raised somewhere.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -338,15 +338,59 @@ function main(): void {
   );
   check(
     "provisioning uses the provider's one-time link, not a generated credential",
-    /signInWithOtp/.test(provisioning) &&
-      /shouldCreateUser:\s*true/.test(provisioning),
+    /generateLink/.test(provisioning) &&
+      /type,\s*$|\["magiclink", "invite"\]/m.test(provisioning),
+    "Supabase mints the link; no password is ever created",
   );
+  // This invariant USED to be "no service-role client exists anywhere". It
+  // cannot be that any more: delivering the activation link over the
+  // application's own SMTP requires `auth.admin.generateLink`, which is an
+  // admin API. Relying on Supabase to send it instead was tried and failed in
+  // production — a two-per-hour cap on the built-in mailer meant real visitors
+  // received a confirmation email containing no link at all.
+  //
+  // So the invariant is narrowed rather than dropped: the key is read in
+  // exactly ONE audited module, and no feature source may reach for it. That
+  // still fails the moment somebody adds a second caller, which is the
+  // property worth keeping.
   check(
-    "and it introduces no service-role client",
-    ![provisioning, service, ideaRoute, bookingRoute].some((source) =>
+    "no feature source reads the service-role key",
+    ![provisioning, service, ideaRoute, bookingRoute, engine].some((source) =>
       /SERVICE_ROLE|service_role/.test(code(source)),
     ),
-    "the invariant every other phase preserves",
+    "only lib/supabase/admin.ts may, and only to mint a link",
+  );
+  check(
+    "the service-role key is read in exactly one module",
+    (() => {
+      const roots = ["app", "features", "lib"];
+      const hits: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (/\.tsx?$/.test(entry.name)) {
+            if (/SUPABASE_SERVICE_ROLE_KEY/.test(readFileSync(full, "utf8"))) {
+              hits.push(full.split(path.sep).join("/"));
+            }
+          }
+        }
+      };
+      roots.forEach(walk);
+      return hits.length === 1 && hits[0]!.endsWith("lib/supabase/admin.ts");
+    })(),
+    "a second reader is a real widening of the blast radius",
+  );
+  check(
+    "the admin client is server-only and never persists a session",
+    (() => {
+      const admin = read("lib/supabase/admin.ts");
+      return (
+        /import "server-only"/.test(admin) &&
+        /persistSession:\s*false/.test(admin) &&
+        /autoRefreshToken:\s*false/.test(admin)
+      );
+    })(),
   );
   check(
     "the activation path never reveals whether an email is registered",
@@ -455,13 +499,30 @@ function main(): void {
           source.indexOf("supabase.rpc("),
           source.indexOf("captureLead("),
         ].filter((index) => index !== -1);
-        // The CALL site, not the import above it.
-        const email = source.indexOf("void emitCommunicationEvent(");
+        // The CALL site, not the import above it. The send now lives inside
+        // an `after` callback, so that is what has to come second.
+        const email = source.indexOf("after(async () =>");
         return (
           persist.length > 0 && email !== -1 && Math.min(...persist) < email
         );
       })(),
       "a provider outage must cost a notification, never the lead",
+    );
+    check(
+      `the ${name} route sends inside after(), not as a floating promise`,
+      /import \{ after[,}]/.test(route) &&
+        /after\(async \(\) => \{[\s\S]{0,200}emitCommunicationEvent\(/.test(
+          code(route),
+        ) &&
+        !/void emitCommunicationEvent\(/.test(code(route)),
+      "a bare void promise is killed when the serverless response returns — " +
+        "verified in production: a lead written, zero email_logs rows",
+    );
+    check(
+      `the ${name} route mints the activation link itself`,
+      /createActivationLink\(/.test(code(route)) &&
+        /activation_url:/.test(code(route)),
+      "Supabase's own mailer caps at two an hour and silently sent nothing",
     );
   }
   check(
@@ -551,10 +612,11 @@ function main(): void {
     ),
   );
   check(
-    "no service-role client is introduced anywhere",
+    "no migration and no feature source reaches for the service role",
     !/SERVICE_ROLE|service_role/.test(
       migration.replace(/--.*$/gm, "") + code(featureSources),
     ),
+    "the one permitted reader is lib/supabase/admin.ts, asserted above",
   );
 
   // =========================================================================
