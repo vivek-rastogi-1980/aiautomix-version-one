@@ -347,8 +347,8 @@ export default async function AdminDashboard() {
         </div>
 
         <p className="mt-3 text-xs text-muted-strong">
-          Stage counts come from the lead timeline, so a stage only appears
-          once something writes its event. Leads captured before an event was
+          Stage counts come from the lead timeline, so a stage only appears once
+          something writes its event. Leads captured before an event was
           instrumented have no row for it and are counted at zero rather than
           being back-filled from a proxy — which is why historical leads can
           show a later stage without the earlier one.

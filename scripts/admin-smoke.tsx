@@ -633,7 +633,10 @@ function main(): void {
   // =========================================================================
 
   const commandMigration = readFileSync(
-    path.join(process.cwd(), "supabase/migrations/0024_command_center_stats.sql"),
+    path.join(
+      process.cwd(),
+      "supabase/migrations/0024_command_center_stats.sql",
+    ),
     "utf8",
   );
 
