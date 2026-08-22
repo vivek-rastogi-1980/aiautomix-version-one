@@ -24,6 +24,11 @@ const PROTECTED_PREFIXES = [
   // clicked "Book a Free AI Strategy Session" would log in and land on the
   // dashboard, having lost what they were trying to do.
   "/strategy-session",
+  // First-run password setup. Protected because there is nothing to set a
+  // password on without a session — but deliberately NOT in AUTH_ROUTES below,
+  // which bounces signed-in users away. The people who need this page are
+  // signed in; bouncing them would make it unreachable.
+  "/change-password",
   // The product surfaces added by phases 8-10. Each is inside the (dashboard)
   // group, so the layout already refused an anonymous visitor and no data was
   // ever exposed — but the redirect lost `redirectTo` the same way, and the

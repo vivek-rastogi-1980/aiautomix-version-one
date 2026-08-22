@@ -34,6 +34,12 @@ export type Profile = {
   suspended_reason: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * True when the account was provisioned through the funnel and the person
+   * has not chosen a password yet (migration 0026). Not a credential: the
+   * schema still stores no password, hash or token of any kind.
+   */
+  password_setup_required: boolean;
 };
 
 export type Project = {

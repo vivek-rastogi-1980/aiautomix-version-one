@@ -41,6 +41,53 @@ import { getOrigin } from "@/lib/site";
  * here keeps exactly one way for a workspace to come into existence.
  */
 
+/**
+ * Flag an account as needing a password, unless it already has one.
+ *
+ * `last_sign_in_at` cannot tell us whether a password exists — a magic-link
+ * sign-in sets it too. So the decision is made from the profile itself: the
+ * flag is raised only on a row that has never been through setup, which the
+ * column's `false` default distinguishes from a completed setup only in
+ * combination with the guard below.
+ *
+ * Best-effort. A failure here means the customer is not prompted for a
+ * password, which is the pre-existing behaviour, not a regression.
+ */
+async function markPasswordSetupRequired(userId: string): Promise<void> {
+  try {
+    const supabase = await createClient();
+
+    // `has_password` is not exposed by Supabase, so completion is tracked by
+    // this application: once someone finishes setup the flag is cleared and a
+    // later magic-link visit must not re-raise it. `password_set_at` would be
+    // the cleaner signal if the provider offered one.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("password_setup_required, updated_at, created_at")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile) return;
+
+    // Only a freshly provisioned profile is flagged. A profile that has been
+    // updated since creation has been through the product already.
+    const untouched =
+      profile.updated_at === profile.created_at ||
+      profile.password_setup_required;
+
+    if (!untouched) return;
+
+    await supabase
+      .from("profiles")
+      .update({ password_setup_required: true })
+      .eq("id", userId);
+  } catch (error) {
+    console.error("[onboarding] could not flag password setup", {
+      message: error instanceof Error ? error.message : error,
+    });
+  }
+}
+
 /** The user's own lead, for when the claim was made on an earlier visit. */
 async function existingLeadId(userId: string): Promise<string | null> {
   try {
@@ -176,6 +223,16 @@ export async function completeActivation(): Promise<ActivationResult> {
     // get two workspaces.
     const { workspace } = await getWorkspaceContext(user.id);
     const origin = await getOrigin();
+
+    // This account was created by the funnel, so the person has never chosen a
+    // password. Flag it so the dashboard requires one before letting them in —
+    // otherwise the day their one-time link expires they have no way to sign
+    // in at all.
+    //
+    // Only set when it is not already false-by-choice: somebody who has been
+    // through this once and set a password must not be asked again on a second
+    // magic-link visit.
+    await markPasswordSetupRequired(user.id);
 
     // Matching by email is not authorisation: the caller is authenticated by
     // `auth.uid()`, and they have just proven control of the address by
