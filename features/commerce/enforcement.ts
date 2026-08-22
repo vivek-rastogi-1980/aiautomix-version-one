@@ -118,9 +118,7 @@ export async function consumeEntitlement(
         : undefined,
     period: typeof row["period"] === "string" ? row["period"] : undefined,
     periodStart:
-      typeof row["period_start"] === "string"
-        ? row["period_start"]
-        : undefined,
+      typeof row["period_start"] === "string" ? row["period_start"] : undefined,
     replayed: row["replayed"] === true,
   };
 }
