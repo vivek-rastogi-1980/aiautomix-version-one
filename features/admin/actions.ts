@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
@@ -431,18 +432,23 @@ export async function setBookingStatus(
       .maybeSingle();
 
     if (booking) {
-      void emitCommunicationEvent("BOOKING_CANCELLED", {
-        recipientEmail: booking.email,
-        userId: booking.user_id,
-        leadId: booking.lead_id,
-        bookingId,
-        variables: {
-          "user.first_name": booking.full_name.split(/\s+/)[0] ?? "",
-          "user.email": booking.email,
-          ...formatBookingSlot(booking.scheduled_at, booking.timezone),
-        },
-      }).catch((sendError) => {
-        console.error("[admin] cancellation email failed", sendError);
+      // `after`, not a floating promise: a server action's invocation ends
+      // with its response, and on Vercel that cut the SMTP send off before it
+      // completed. Same defect and same fix as the funnel routes.
+      after(async () => {
+        await emitCommunicationEvent("BOOKING_CANCELLED", {
+          recipientEmail: booking.email,
+          userId: booking.user_id,
+          leadId: booking.lead_id,
+          bookingId,
+          variables: {
+            "user.first_name": booking.full_name.split(/\s+/)[0] ?? "",
+            "user.email": booking.email,
+            ...formatBookingSlot(booking.scheduled_at, booking.timezone),
+          },
+        }).catch((sendError) => {
+          console.error("[admin] cancellation email failed", sendError);
+        });
       });
     }
   }
