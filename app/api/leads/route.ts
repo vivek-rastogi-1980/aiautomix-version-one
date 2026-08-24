@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
     // A contact enquiry is genuinely different and still gets no link —
     // somebody asking a question has not asked for an account.
     const activationUrl = FUNNEL_SOURCES.has(lead.source)
-      ? await createActivationLink(lead.email, "/dashboard")
+      ? await createActivationLink(lead.email, "/dashboard", lead.name)
       : null;
 
     await Promise.allSettled([

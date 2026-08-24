@@ -525,6 +525,85 @@ function main(): void {
       "Supabase's own mailer caps at two an hour and silently sent nothing",
     );
   }
+
+  // =========================================================================
+  // ACTIVATION LINKS SURVIVE A MAIL SCANNER
+  // =========================================================================
+  //
+  // The activation link used to point at /auth/confirm, which verifies on GET.
+  // Verification is single-use and mail providers prefetch links to scan them,
+  // so the scanner spent the token and the recipient was told the link was
+  // invalid or expired. These lock in the fix.
+
+  check(
+    "the activation link lands on /register, not on a route that verifies on GET",
+    /\/register`\)/.test(code(provisioning)) &&
+      !/\/auth\/confirm`\)/.test(code(provisioning)),
+    "a GET must not be able to spend the token — mail scanners prefetch",
+  );
+  check(
+    "the link carries the token plus prefill for the name and address",
+    (() => {
+      const source = code(provisioning);
+      return ["token_hash", "type", "email", "name"].every((key) =>
+        source.includes(`searchParams.set("${key}"`),
+      );
+    })(),
+  );
+  check(
+    "the token is exchanged in a server action, on submit",
+    (() => {
+      const actions = code(read("features/auth/actions.ts"));
+      const index = actions.indexOf("activateAccountAction");
+      return index !== -1 && /verifyOtp\(/.test(actions.slice(index));
+    })(),
+  );
+  check(
+    "the register page reads the token but never verifies it",
+    (() => {
+      const page = code(read("app/(auth)/register/page.tsx"));
+      return (
+        /token_hash/.test(page) && !/verifyOtp|completeActivation/.test(page)
+      );
+    })(),
+    "verifying during render would put it back on the GET",
+  );
+  check(
+    "activation never calls signUp, so no confirmation email is sent",
+    (() => {
+      const actions = code(read("features/auth/actions.ts"));
+      const start = actions.indexOf(
+        "export async function activateAccountAction",
+      );
+      const body = actions.slice(start);
+      return start !== -1 && !/signUp\(/.test(body);
+    })(),
+    "the emailed token already proves the address",
+  );
+  check(
+    "the activation form takes no email — the token settles the account",
+    (() => {
+      const auth = read("lib/validations/auth.ts");
+      const start = auth.indexOf("activateAccountSchema");
+      const body = auth.slice(start, auth.indexOf("});", start));
+      return start !== -1 && !/email/.test(body);
+    })(),
+    "accepting one would imply the form could change which account is claimed",
+  );
+  check(
+    "password setup is cleared AFTER the password is set, not before",
+    (() => {
+      const actions = code(read("features/auth/actions.ts"));
+      const start = actions.indexOf(
+        "export async function activateAccountAction",
+      );
+      const body = actions.slice(start);
+      const update = body.indexOf("updateUser(");
+      const clear = body.indexOf("password_setup_required");
+      return update !== -1 && clear !== -1 && update < clear;
+    })(),
+    "otherwise a failed update leaves somebody with no password and no prompt",
+  );
   check(
     "the honeypot answers success so a bot learns nothing",
     /company_website\)\s*\{[\s\S]{0,200}apiSuccess/.test(ideaRoute),

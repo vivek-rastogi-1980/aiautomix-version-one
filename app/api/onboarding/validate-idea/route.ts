@@ -156,7 +156,11 @@ export async function POST(request: NextRequest) {
     // Supabase's built-in mailer allows two messages an hour, so in production
     // it returned `over_email_send_rate_limit`, created no account, and the
     // visitor received a confirmation with no link in it.
-    const activationUrl = await createActivationLink(input.email, "/dashboard");
+    const activationUrl = await createActivationLink(
+      input.email,
+      "/dashboard",
+      [input.firstName, input.lastName].filter(Boolean).join(" "),
+    );
 
     // Fire the confirmation AFTER the response, not alongside it.
     //
