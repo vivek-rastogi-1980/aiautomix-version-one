@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { acknowledgeLead, notifyNewLead } from "@/lib/leads/notify";
 import { rateLimit } from "@/lib/rate-limit";
 import { leadSchema } from "@/lib/validations/lead";
+import { createActivationLink } from "@/features/onboarding/provisioning";
 import {
   apiError,
   apiSuccess,
@@ -31,6 +32,16 @@ export const dynamic = "force-dynamic";
  * authenticated, so this endpoint can write a lead but nothing reachable from
  * the browser can read the table back.
  */
+
+/**
+ * Sources that mean "this person wants to use the product", as opposed to
+ * "this person has a question". Only these are sent an activation link.
+ *
+ * Kept as a set here rather than a flag on the request: the client chooses the
+ * source string, so treating it as a switch the browser can flip would let any
+ * caller turn a contact enquiry into an account provisioning request.
+ */
+const FUNNEL_SOURCES = new Set(["idea-validation", "strategy-session"]);
 
 /** 5 submissions per IP per 10 minutes. Generous for a human, hostile to a script. */
 const LEAD_LIMIT = 5;
@@ -130,7 +141,27 @@ export async function POST(request: NextRequest) {
     // When migration 0019 is applied and a template is ACTIVE, the visitor
     // half should move to `features/communications/service.ts` for editable
     // copy and a delivery log. See the note in `lib/leads/notify.ts`.
-    await Promise.allSettled([notifyNewLead(lead), acknowledgeLead(lead)]);
+    //
+    // The activation link is minted for funnel sources only.
+    //
+    // This endpoint serves both the marketing forms AND the two homepage
+    // funnel modals, and that difference had been invisible: a visitor who
+    // used the homepage "Validate your business idea" modal got an
+    // acknowledgement with no way into the product, while the identical
+    // submission on `/validate-your-idea` got a proper activation link. Same
+    // intent, same person, two different outcomes decided by which page they
+    // happened to be on.
+    //
+    // A contact enquiry is genuinely different and still gets no link —
+    // somebody asking a question has not asked for an account.
+    const activationUrl = FUNNEL_SOURCES.has(lead.source)
+      ? await createActivationLink(lead.email, "/dashboard")
+      : null;
+
+    await Promise.allSettled([
+      notifyNewLead(lead),
+      acknowledgeLead(lead, activationUrl),
+    ]);
 
     return apiSuccess({ received: true }, 201);
   } catch (error) {
