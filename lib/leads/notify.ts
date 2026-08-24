@@ -173,19 +173,61 @@ const ACKNOWLEDGEMENT: Record<
  * Sent to the address the visitor typed, which is unverified input — hence the
  * escaping on every interpolated value, and hence nothing sensitive in the
  * body. Somebody can put another person's address into a public form, so this
- * message must be harmless to receive unexpectedly: it confirms an enquiry and
- * carries no account, no link that grants access, and no personal data beyond
- * the name that was typed.
+ * message must be harmless to receive unexpectedly.
+ *
+ * ---------------------------------------------------------------------------
+ * On the activation link
+ * ---------------------------------------------------------------------------
+ * This used to carry "no link that grants access", for the reason above. It now
+ * carries one for the two funnel sources, and that is safe for the same reason
+ * a magic link is: the link reaches ONLY the address it authenticates. Typing
+ * somebody else's address into the form emails THEM a way into their own
+ * workspace — it hands the sender nothing.
+ *
+ * The alternative was worse. The homepage forms are the ones most visitors
+ * actually use, and they sent this acknowledgement with no way in at all, while
+ * `/validate-your-idea` sent a proper activation email. The same submission got
+ * two different outcomes depending on which page it came from.
+ *
+ * The contact form still gets no link. Somebody asking a question has not asked
+ * for an account, and provisioning one uninvited is not an acknowledgement.
  */
-export async function acknowledgeLead(lead: LeadInput): Promise<void> {
+export async function acknowledgeLead(
+  lead: LeadInput,
+  /** Only supplied for funnel sources; contact enquiries never get one. */
+  activationUrl?: string | null,
+): Promise<void> {
   const copy = ACKNOWLEDGEMENT[lead.source] ?? ACKNOWLEDGEMENT["contact"]!;
 
   const firstName = (lead.name ?? "").trim().split(/\s+/)[0] ?? "";
   const greeting = firstName ? `Hi ${firstName},` : "Hi,";
 
+  // Empty when the mint failed, or when this is a contact enquiry. The message
+  // still has to read as a complete acknowledgement without it — a dead button
+  // is worse than no button.
+  const linkText = activationUrl
+    ? `Open your workspace and choose a password:\n${activationUrl}\n\n` +
+      `The link can only be used once. If it has expired by the time you ` +
+      `get to it, request a new one from the login page.\n\n`
+    : "";
+
+  const linkHtml = activationUrl
+    ? `<p style="margin: 28px 0;"><a href="${escapeHtml(activationUrl)}" ` +
+      `style="background: #5b5bd6; color: #ffffff; text-decoration: none; ` +
+      `padding: 12px 22px; border-radius: 8px; display: inline-block; ` +
+      `font-weight: 600;">Open my workspace and set a password</a></p>` +
+      `<p style="color: #666; font-size: 14px; word-break: break-all;">` +
+      `If the button does not work, paste this into your browser:<br>` +
+      `${escapeHtml(activationUrl)}</p>` +
+      `<p style="color: #666; font-size: 14px;">The link can only be used ` +
+      `once. If it has expired by the time you get to it, request a new one ` +
+      `from the login page.</p>`
+    : "";
+
   const text =
     `${greeting}\n\n` +
     `${copy.lead}\n\n` +
+    `${linkText}` +
     `${copy.next}\n\n` +
     `— The AIAutoMix team\n` +
     `${LEAD_INBOX}\n`;
@@ -194,6 +236,7 @@ export async function acknowledgeLead(lead: LeadInput): Promise<void> {
     `<div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; font-size: 16px; line-height: 1.6; color: #1a1a1a; max-width: 560px;">` +
     `<p>${escapeHtml(greeting)}</p>` +
     `<p>${escapeHtml(copy.lead)}</p>` +
+    `${linkHtml}` +
     `<p>${escapeHtml(copy.next)}</p>` +
     `<p style="color: #666; font-size: 14px;">— The AIAutoMix team<br>` +
     `<a href="mailto:${escapeHtml(LEAD_INBOX)}">${escapeHtml(LEAD_INBOX)}</a></p>` +
