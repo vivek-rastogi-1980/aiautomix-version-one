@@ -2,15 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { getOrigin, safeRedirectPath } from "@/lib/site";
 import {
+  activateAccountSchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
 } from "@/lib/validations/auth";
+import { completeActivation } from "@/features/onboarding/activation";
 import {
   type ActionState,
   errorState,
@@ -236,4 +239,122 @@ export async function completePasswordSetupAction(
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
+}
+
+/**
+ * Finish an emailed activation: prove the address, then set the password.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this exists instead of routing the email link at /auth/confirm
+ * ---------------------------------------------------------------------------
+ * `/auth/confirm` verifies on GET, and a GET is the one request nobody
+ * controls. Gmail, Outlook and corporate mail gateways prefetch links to scan
+ * them; the scanner spends the single-use token and the human who clicks a
+ * moment later is told the link is invalid or has expired. That is the failure
+ * customers actually hit.
+ *
+ * Here the token is exchanged on POST. A prefetching scanner renders a form and
+ * spends nothing.
+ *
+ * ---------------------------------------------------------------------------
+ * Why no confirmation email is sent
+ * ---------------------------------------------------------------------------
+ * `signUp` is never called, so Supabase never mails anything. It would also be
+ * redundant: `verifyOtp` succeeds only for a token that was delivered to that
+ * inbox, so reaching this point IS proof of address ownership. Sending a second
+ * email to confirm what the first email already proved is friction with no
+ * security value.
+ *
+ * ---------------------------------------------------------------------------
+ * The address comes from the token, never from the form
+ * ---------------------------------------------------------------------------
+ * The page prefills `email` from the query string so the visitor sees who they
+ * are signing up as, and the field is read-only. But nothing here reads it:
+ * `verifyOtp` resolves the account from the token alone. Editing the parameter
+ * changes what the box displays and nothing else — it cannot create or claim an
+ * account for another address.
+ */
+export async function activateAccountAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const tokenHash = String(formData.get("token_hash") ?? "");
+  const type = String(formData.get("type") ?? "") as EmailOtpType;
+
+  if (!tokenHash || !type) {
+    return errorState(
+      "That activation link is incomplete. Please use the link in your email, or reset your password.",
+    );
+  }
+
+  const parsed = activateAccountSchema.safeParse({
+    fullName: formData.get("fullName"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    return errorState(
+      "Please fix the errors below.",
+      zodFieldErrors(parsed.error),
+    );
+  }
+
+  const supabase = await createClient();
+
+  // Spends the token and establishes the session. Everything after this point
+  // runs as the customer, under their own RLS.
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    type,
+    token_hash: tokenHash,
+  });
+
+  if (verifyError) {
+    // Genuinely expired or already used — say so plainly and point at the two
+    // ways out rather than returning a provider message.
+    return errorState(
+      "That link has expired or has already been used. Please request a new one from the sign-in page.",
+    );
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return errorState(
+      "We could not open your account just now. Please try the link again.",
+    );
+  }
+
+  // Provisions the workspace, claims the anonymous lead and carries the
+  // submitted idea into the product — the same handoff `/auth/confirm` runs.
+  // Awaited so the workspace exists before /dashboard renders. It never throws.
+  await completeActivation();
+
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+    data: { full_name: parsed.data.fullName },
+  });
+
+  if (updateError) {
+    return errorState(updateError.message);
+  }
+
+  // Cleared only AFTER the password is genuinely set, and cleared LAST because
+  // `completeActivation` raises this flag on a freshly provisioned profile.
+  // Doing it in the other order would send somebody who just chose a password
+  // straight back to the "create your password" screen.
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ password_setup_required: false })
+    .eq("id", user.id);
+
+  if (profileError) {
+    console.error("[auth] could not clear password_setup_required", {
+      code: profileError.code,
+    });
+  }
+
+  revalidatePath("/", "layout");
+  redirect(safeRedirectPath(formData.get("next") as string));
 }

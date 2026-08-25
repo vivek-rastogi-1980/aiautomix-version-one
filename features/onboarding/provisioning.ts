@@ -85,6 +85,24 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *     dropping the path and skipping activation entirely.
  *
  * ---------------------------------------------------------------------------
+ * Why the link lands on /register and NOT on /auth/confirm
+ * ---------------------------------------------------------------------------
+ * `/auth/confirm` verifies on GET. Verification is single-use, and a GET is the
+ * one request nobody controls: Gmail, Outlook and corporate mail gateways all
+ * prefetch links to scan them for malware. The scanner spends the token, and
+ * the human who clicks a second later is told the link is invalid or expired —
+ * which is exactly what customers reported.
+ *
+ * A second consumer made it worse: `generateLink` invalidates the previous
+ * token for that user, so someone who submitted two forms found the first
+ * email's link already dead.
+ *
+ * Landing on `/register` moves verification to the form POST. A prefetching
+ * scanner renders a form and spends nothing; the token is exchanged only when a
+ * person actually submits a password. The email address and name ride along so
+ * the page can prefill them.
+ *
+ * ---------------------------------------------------------------------------
  * Two link types, because the user may or may not exist yet
  * ---------------------------------------------------------------------------
  * `magiclink` requires an existing user; `invite` creates one. Trying magic
@@ -98,6 +116,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function createActivationLink(
   email: string,
   redirectPath = "/dashboard",
+  /** Prefills the name field so the visitor does not retype what they just gave. */
+  fullName?: string | null,
 ): Promise<string | null> {
   const admin = createAdminClient();
   if (!admin) {
@@ -119,11 +139,16 @@ export async function createActivationLink(
 
     const hashedToken = data?.properties?.hashed_token;
     if (!error && hashedToken) {
-      const url = new URL(`${origin}/auth/confirm`);
+      const url = new URL(`${origin}/register`);
       url.searchParams.set("token_hash", hashedToken);
       // `invite` and `magiclink` are both valid `EmailOtpType` values, and the
-      // confirm route passes whichever arrives straight to `verifyOtp`.
+      // activation action passes whichever arrives straight to `verifyOtp`.
       url.searchParams.set("type", type);
+      // Prefill only. The address the account is created for comes from the
+      // TOKEN, never from this parameter — editing it in the URL changes what
+      // the box displays and nothing else.
+      url.searchParams.set("email", email);
+      if (fullName?.trim()) url.searchParams.set("name", fullName.trim());
       url.searchParams.set("next", redirectPath);
       return url.toString();
     }

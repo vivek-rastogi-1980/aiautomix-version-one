@@ -28,6 +28,23 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
+/**
+ * Finishing an emailed activation.
+ *
+ * Like `registerSchema` without `email`: the address is settled by the token in
+ * the link, so accepting one here would imply the form could change it.
+ */
+export const activateAccountSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Please enter your name").max(120),
+    password,
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const forgotPasswordSchema = z.object({ email });
 
 export const resetPasswordSchema = z
@@ -42,5 +59,6 @@ export const resetPasswordSchema = z
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type ActivateAccountInput = z.infer<typeof activateAccountSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

@@ -172,7 +172,11 @@ export async function POST(request: NextRequest) {
     // Minted, not sent: the link travels in the confirmation email this route
     // already sends over our own SMTP. Asking Supabase to send it hit a
     // two-per-hour cap in production and delivered nothing.
-    const activationUrl = await createActivationLink(input.email, "/dashboard");
+    const activationUrl = await createActivationLink(
+      input.email,
+      "/dashboard",
+      input.fullName,
+    );
 
     // Formatted in the visitor's own zone, not sliced out of the UTC ISO
     // string. Slicing produced a confirmation reading "09:30, Asia/Kolkata"
