@@ -4,10 +4,7 @@ import { after } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/features/workspaces/data";
-import {
-  claimLeadForCurrentUser,
-  recordLeadEvent,
-} from "@/features/onboarding/provisioning";
+import { claimLeadForCurrentUser } from "@/features/onboarding/provisioning";
 import { emitCommunicationEvent } from "@/features/communications/service";
 import { getUser } from "@/lib/auth/session";
 import { getOrigin } from "@/lib/site";
@@ -105,36 +102,6 @@ async function existingLeadId(userId: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-/**
- * Record a lead event only if that event is not already on the timeline.
- *
- * `lead_events` is append-only by design, so nothing removes a duplicate once
- * written. The check is a read rather than a constraint because the table
- * legitimately holds repeats of most events — a customer can view a report
- * many times — and only the once-per-lifetime ones are deduplicated here.
- */
-async function recordLeadEventOnce(
-  leadId: string,
-  event: string,
-  metadata: Record<string, unknown>,
-): Promise<void> {
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("lead_events")
-      .select("id")
-      .eq("lead_id", leadId)
-      .eq("event", event)
-      .limit(1)
-      .maybeSingle();
-    if (data) return;
-  } catch {
-    // Unreadable timeline: fall through and record. A duplicate row is a
-    // smaller problem than a missing one.
-  }
-  await recordLeadEvent(leadId, event, metadata);
 }
 
 /**
@@ -249,13 +216,18 @@ export async function completeActivation(): Promise<ActivationResult> {
     const leadId = claimedId ?? (await existingLeadId(user.id));
 
     if (leadId) {
-      // Idempotent: activation can legitimately run more than once (a link
-      // followed twice, a refresh), and a timeline that says the account was
-      // created three times is a timeline an admin stops trusting.
-      await recordLeadEventOnce(leadId, "ACCOUNT_CREATED", {});
-      await recordLeadEventOnce(leadId, "WORKSPACE_CREATED", {
-        workspace_id: workspace.id,
-      });
+      // ACCOUNT_CREATED and WORKSPACE_CREATED are deliberately NOT written
+      // here. `lead_claim_for_user` inserts both in the same transaction that
+      // claims the lead, and it is the only writer: it runs `security definer`
+      // and fires exactly once, on the claim that returns a lead id.
+      //
+      // They used to be recorded again here behind a read-your-own-timeline
+      // guard, which cannot work for the people it was written for —
+      // `lead_events` is selectable by admins only, so a customer's guard read
+      // comes back empty and writes a second copy of both events. Re-activation
+      // (a link followed twice, a refresh) stays safe without the guard: the
+      // claim returns null the second time and inserts nothing, and the
+      // fallback below only re-finds a lead whose events the RPC already wrote.
 
       // Carry the submitted idea into the product.
       //

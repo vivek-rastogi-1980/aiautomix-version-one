@@ -89,6 +89,7 @@ function main(): void {
   const engine = read("features/communications/template-engine.ts");
   const service = read("features/communications/service.ts");
   const provisioning = read("features/onboarding/provisioning.ts");
+  const activation = read("features/onboarding/activation.ts");
   const ideaRoute = read("app/api/onboarding/validate-idea/route.ts");
   const bookingRoute = read("app/api/onboarding/bookings/route.ts");
   const validations = read("lib/validations/onboarding.ts");
@@ -115,7 +116,7 @@ function main(): void {
   const eventCallSites = [
     ideaRoute,
     bookingRoute,
-    read("features/onboarding/activation.ts"),
+    activation,
     read("features/onboarding/validation-events.ts"),
     read("features/admin/actions.ts"),
   ].map(code);
@@ -458,6 +459,22 @@ function main(): void {
     "and no request schema has a field a client could supply one through",
     !/idempotency/i.test(code(validations)),
     "a client-supplied key is a client-supplied duplicate",
+  );
+
+  // The claim RPC inserts ACCOUNT_CREATED and WORKSPACE_CREATED itself, in the
+  // transaction that claims the lead. A second writer in activation.ts gave
+  // every activated customer a doubled timeline: the dedup it relied on was a
+  // SELECT on `lead_events`, which is admin-readable only, so it never fired
+  // for the customers it existed for.
+  check(
+    "the claim RPC is the only writer of the activation events",
+    /'ACCOUNT_CREATED'/.test(migration) && /'WORKSPACE_CREATED'/.test(migration),
+    "lead_claim_for_user inserts both, security definer",
+  );
+  check(
+    "and activation.ts does not record them a second time",
+    !/ACCOUNT_CREATED|WORKSPACE_CREATED/.test(code(activation)),
+    "an activation timeline must not say the account was created twice",
   );
 
   // =========================================================================
