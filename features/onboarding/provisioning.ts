@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Account and workspace provisioning.
@@ -8,21 +9,31 @@ import { createClient } from "@/lib/supabase/server";
  * ---------------------------------------------------------------------------
  * Why this does not create the user itself
  * ---------------------------------------------------------------------------
- * Creating a Supabase auth user from the server normally means
- * `auth.admin.createUser` — which needs the SERVICE ROLE key. This codebase has
- * an absolute, repeatedly-tested rule that no service-role client exists
- * anywhere: five smoke suites assert `!/service_role/` across the feature
- * source. Introducing one here to save a click would quietly remove the
- * property that every other phase was built to preserve.
- *
- * So provisioning uses the provider's own mechanism instead:
+ * Creating a Supabase auth user from the server means `auth.admin` — which
+ * needs the SERVICE ROLE key. This codebase used to forbid that outright, and
+ * relied on the provider to both mint the link and email it:
  *
  *   signInWithOtp({ email, shouldCreateUser: true })
  *
- * Supabase creates the user and emails a one-time link. No password is ever
- * generated, transmitted or stored — which is exactly what the brief asks for
- * ("ACCOUNT CREATED → SECURE ACTIVATION LINK → USER CREATES THEIR PASSWORD"),
- * and it needs nothing but the anon key.
+ * That failed in production, and failed silently. Supabase's built-in email
+ * service allows two messages an hour; the funnel's real submissions came back
+ * `over_email_send_rate_limit`, GoTrue rolled the whole request back — so the
+ * account was never even created — and `inviteVisitor` swallowed the error and
+ * reported success. Visitors got a confirmation email with no way in.
+ *
+ * `createActivationLink` inverts the responsibility. Supabase MINTS the link
+ * (`generateLink` returns it and sends nothing); this application DELIVERS it,
+ * over the same Hostinger SMTP that already carries every other message. One
+ * email, one link, and no dependency on a mailer nobody configured.
+ *
+ * That does introduce a service-role client, which is a real reduction in the
+ * blast radius this codebase used to guarantee. It is confined to
+ * `lib/supabase/admin.ts`, it is used for this one call, and the smoke suites
+ * now assert that no OTHER module reads the key — a narrower invariant than
+ * "never", deliberately, and still an enforced one.
+ *
+ * No password is ever generated, transmitted or stored. Authentication remains
+ * entirely Supabase Auth's business.
  *
  * ---------------------------------------------------------------------------
  * Why the workspace waits for activation
@@ -44,59 +55,117 @@ import { createClient } from "@/lib/supabase/server";
  *   click  → session exists → workspace + idea + validation   (verified)
  */
 
-export interface InviteResult {
-  ok: boolean;
-  /** True when the provider accepted the request and dispatched a link. */
-  invited: boolean;
-  message: string;
-}
-
 /**
- * Ask the auth provider to create the account and email an activation link.
+ * Mint a one-time activation link for an address, WITHOUT sending anything.
  *
- * Always reports success to the caller regardless of whether the address was
- * already registered. That is deliberate and matches `requestPasswordResetAction`
- * in this codebase: a public form that answers "that email already has an
- * account" differently from "it does not" is an account-enumeration oracle.
+ * `generateLink` is a pure mint: it returns the token and dispatches no email.
+ * The caller puts the resulting URL into a message this application sends
+ * itself, which is the whole point — see the module header for why the
+ * provider's own mailer stopped being trustworthy.
+ *
+ * ---------------------------------------------------------------------------
+ * Why the returned `action_link` is NOT used
+ * ---------------------------------------------------------------------------
+ * `properties.action_link` points at GoTrue's own `/auth/v1/verify`, which
+ * verifies the token and then redirects to the app with the resulting session
+ * in the URL **fragment**. A fragment is never sent to a server, so
+ * `/auth/confirm` — a Route Handler — sees no parameters at all and bounces the
+ * visitor to `/login?error=invalid_link`. Confirmed by following a real link:
+ * it consumed the token and landed on the error page.
+ *
+ * `properties.hashed_token` is the same credential in the form this
+ * application's confirm route already accepts (`token_hash` + `type`, exchanged
+ * server-side by `verifyOtp`). Building the URL here means:
+ *
+ *   - the session is established server-side, where the cookie can be set
+ *   - the link points at our own domain, so nothing depends on Supabase's
+ *     redirect allow-list. That allow-list held the `www` host while
+ *     `NEXT_PUBLIC_SITE_URL` was the apex domain, and GoTrue does not reject a
+ *     redirect that is missing from it — it silently substitutes the Site URL,
+ *     dropping the path and skipping activation entirely.
+ *
+ * ---------------------------------------------------------------------------
+ * Why the link lands on /register and NOT on /auth/confirm
+ * ---------------------------------------------------------------------------
+ * `/auth/confirm` verifies on GET. Verification is single-use, and a GET is the
+ * one request nobody controls: Gmail, Outlook and corporate mail gateways all
+ * prefetch links to scan them for malware. The scanner spends the token, and
+ * the human who clicks a second later is told the link is invalid or expired —
+ * which is exactly what customers reported.
+ *
+ * A second consumer made it worse: `generateLink` invalidates the previous
+ * token for that user, so someone who submitted two forms found the first
+ * email's link already dead.
+ *
+ * Landing on `/register` moves verification to the form POST. A prefetching
+ * scanner renders a form and spends nothing; the token is exchanged only when a
+ * person actually submits a password. The email address and name ride along so
+ * the page can prefill them.
+ *
+ * ---------------------------------------------------------------------------
+ * Two link types, because the user may or may not exist yet
+ * ---------------------------------------------------------------------------
+ * `magiclink` requires an existing user; `invite` creates one. Trying magic
+ * link first and falling back handles a first-time visitor without a separate
+ * existence check — which would be a race, and an enumeration oracle if its
+ * result ever reached the response.
+ *
+ * Returns null on any failure. The lead is already committed, and the visitor
+ * is told they can sign in from the login page.
  */
-export async function inviteVisitor(
+export async function createActivationLink(
   email: string,
   redirectPath = "/dashboard",
-): Promise<InviteResult> {
-  const supabase = await createClient();
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: origin
-        ? `${origin}/auth/confirm?next=${encodeURIComponent(redirectPath)}`
-        : undefined,
-    },
-  });
-
-  if (error) {
-    // Logged for operators, never surfaced: the message can distinguish a
-    // registered address from an unregistered one.
-    console.error("[onboarding] activation link not sent", {
-      code: error.status,
-      message: error.message,
-    });
-    return {
-      ok: false,
-      invited: false,
-      message:
-        "Your idea was received. We could not send the activation email just now — you can sign in from the login page at any time.",
-    };
+  /** Prefills the name field so the visitor does not retype what they just gave. */
+  fullName?: string | null,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  if (!admin) {
+    console.error("[onboarding] no service key — cannot mint activation link");
+    return null;
   }
 
-  return {
-    ok: true,
-    invited: true,
-    message:
-      "Check your inbox — we have sent a secure link to open your workspace. No password needed.",
-  };
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+  if (!origin) {
+    console.error("[onboarding] NEXT_PUBLIC_SITE_URL is unset — no link host");
+    return null;
+  }
+
+  for (const type of ["magiclink", "invite"] as const) {
+    const { data, error } = await admin.auth.admin.generateLink({
+      type,
+      email,
+    });
+
+    const hashedToken = data?.properties?.hashed_token;
+    if (!error && hashedToken) {
+      const url = new URL(`${origin}/register`);
+      url.searchParams.set("token_hash", hashedToken);
+      // `invite` and `magiclink` are both valid `EmailOtpType` values, and the
+      // activation action passes whichever arrives straight to `verifyOtp`.
+      url.searchParams.set("type", type);
+      // Prefill only. The address the account is created for comes from the
+      // TOKEN, never from this parameter — editing it in the URL changes what
+      // the box displays and nothing else.
+      url.searchParams.set("email", email);
+      if (fullName?.trim()) url.searchParams.set("name", fullName.trim());
+      url.searchParams.set("next", redirectPath);
+      return url.toString();
+    }
+
+    if (error) {
+      // Logged, never surfaced. The message distinguishes a registered address
+      // from an unregistered one, which is the enumeration oracle this module
+      // has always been careful not to hand out.
+      console.error("[onboarding] activation link not minted", {
+        type,
+        status: error.status,
+        message: error.message,
+      });
+    }
+  }
+
+  return null;
 }
 
 export interface ClaimResult {

@@ -1,4 +1,4 @@
-import { type NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
@@ -11,7 +11,7 @@ import {
 import { bookingSchema } from "@/lib/validations/onboarding";
 import {
   bookingIdempotencyKey,
-  inviteVisitor,
+  createActivationLink,
   leadIdempotencyKey,
 } from "@/features/onboarding/provisioning";
 import { emitCommunicationEvent } from "@/features/communications/service";
@@ -168,30 +168,46 @@ export async function POST(request: NextRequest) {
     const wasExisting = rows[0].was_existing === true;
 
     // Durable write done. Everything below is best-effort.
-    const invite = await inviteVisitor(input.email, "/dashboard");
+    //
+    // Minted, not sent: the link travels in the confirmation email this route
+    // already sends over our own SMTP. Asking Supabase to send it hit a
+    // two-per-hour cap in production and delivered nothing.
+    const activationUrl = await createActivationLink(
+      input.email,
+      "/dashboard",
+      input.fullName,
+    );
 
     // Formatted in the visitor's own zone, not sliced out of the UTC ISO
     // string. Slicing produced a confirmation reading "09:30, Asia/Kolkata"
     // for a 15:00 call — wrong by the offset while looking entirely
     // plausible, and first noticed when somebody misses the meeting.
-    void emitCommunicationEvent("BOOKING_CREATED", {
-      recipientEmail: input.email,
-      leadId,
-      bookingId,
-      variables: {
-        "user.first_name": first,
-        "user.email": input.email,
-        ...formatBookingSlot(scheduledAt, input.timezone),
-      },
-    }).catch((sendError) => {
-      logApiError("POST /api/onboarding/bookings (email)", sendError);
+    //
+    // Sent inside `after` rather than as a floating promise: on Vercel the
+    // invocation is frozen as soon as the response is returned, which killed
+    // the SMTP send mid-flight and left no log row behind. See the same fix
+    // and the production evidence in the validate-idea route.
+    after(async () => {
+      await emitCommunicationEvent("BOOKING_CREATED", {
+        recipientEmail: input.email,
+        leadId,
+        bookingId,
+        variables: {
+          "user.first_name": first,
+          "user.email": input.email,
+          ...formatBookingSlot(scheduledAt, input.timezone),
+          activation_url: activationUrl ?? "",
+        },
+      }).catch((sendError) => {
+        logApiError("POST /api/onboarding/bookings (email)", sendError);
+      });
     });
 
     return apiSuccess({
       booked: true,
       duplicate: wasExisting,
       bookingId,
-      activationSent: invite.invited,
+      activationSent: activationUrl !== null,
       message: wasExisting
         ? "You already have this slot booked — we have not made a second booking."
         : "Your session is booked. Check your inbox for the confirmation.",

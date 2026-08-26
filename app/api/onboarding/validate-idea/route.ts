@@ -1,4 +1,4 @@
-import { type NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 import { rateLimit } from "@/lib/rate-limit";
 import {
@@ -10,7 +10,7 @@ import {
 import { validateIdeaSchema } from "@/lib/validations/onboarding";
 import {
   captureLead,
-  inviteVisitor,
+  createActivationLink,
   leadIdempotencyKey,
 } from "@/features/onboarding/provisioning";
 import { emitCommunicationEvent } from "@/features/communications/service";
@@ -150,28 +150,50 @@ export async function POST(request: NextRequest) {
 
     // The durable write is done. Everything after this point is best-effort and
     // must not be able to fail the submission.
-    const invite = await inviteVisitor(input.email, "/dashboard");
+    //
+    // Minted here, delivered below in our own email. This used to call
+    // `inviteVisitor`, which asked Supabase to both mint AND send — and
+    // Supabase's built-in mailer allows two messages an hour, so in production
+    // it returned `over_email_send_rate_limit`, created no account, and the
+    // visitor received a confirmation with no link in it.
+    const activationUrl = await createActivationLink(
+      input.email,
+      "/dashboard",
+      [input.firstName, input.lastName].filter(Boolean).join(" "),
+    );
 
-    // Fire the confirmation. Skips silently when no template is active or no
-    // provider is configured — both normal states — and logs either way.
-    void emitCommunicationEvent("IDEA_SUBMITTED", {
-      recipientEmail: input.email,
-      leadId,
-      variables: {
-        "user.first_name": input.firstName,
-        "user.email": input.email,
-        "business_idea.title": input.businessIdea.slice(0, 120),
-        "business_idea.industry": input.industry ?? "",
-      },
-    }).catch((sendError) => {
-      logApiError("POST /api/onboarding/validate-idea (email)", sendError);
+    // Fire the confirmation AFTER the response, not alongside it.
+    //
+    // This used to be a floating `void` promise. Locally that works, because
+    // the Node process keeps running once the response is written. On Vercel
+    // it does not: the function is frozen the moment the response is returned,
+    // so the SMTP connection never completes and the log row is never written.
+    // Verified against production — an identical submission produced a lead
+    // and zero `email_logs` rows, while the same request locally produced both.
+    //
+    // `after` is the supported way to say "do this once the response is sent"
+    // and keeps the invocation alive until it settles.
+    after(async () => {
+      await emitCommunicationEvent("IDEA_SUBMITTED", {
+        recipientEmail: input.email,
+        leadId,
+        variables: {
+          "user.first_name": input.firstName,
+          "user.email": input.email,
+          "business_idea.title": input.businessIdea.slice(0, 120),
+          "business_idea.industry": input.industry ?? "",
+          activation_url: activationUrl ?? "",
+        },
+      }).catch((sendError) => {
+        logApiError("POST /api/onboarding/validate-idea (email)", sendError);
+      });
     });
 
     return apiSuccess({
       received: true,
       duplicate: wasExisting,
-      activationSent: invite.invited,
-      message: invite.invited
+      activationSent: activationUrl !== null,
+      message: activationUrl
         ? "Check your inbox — we have sent a secure link to open your workspace. No password needed."
         : "Your idea was received. You can sign in from the login page at any time.",
     });
