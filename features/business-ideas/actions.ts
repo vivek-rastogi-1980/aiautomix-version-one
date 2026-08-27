@@ -63,12 +63,20 @@ export async function submitBusinessIdeaAction(
     return errorState("Your role in this workspace is read-only.");
   }
 
+  // The draft the funnel created for this customer, when the form was opened
+  // from it. Passed through so the run updates that row rather than inserting
+  // a second idea and leaving the original stranded as a draft forever.
+  // Ownership is verified in the service, under the caller's own RLS — a value
+  // arriving from a form is never trusted as authorisation.
+  const draftIdeaId = formData.get("draftIdeaId");
+
   let reportId: string;
   try {
     const outcome = await validateBusinessIdea(
       user.id,
       workspace.id,
       parsed.data,
+      typeof draftIdeaId === "string" && draftIdeaId ? draftIdeaId : null,
     );
     reportId = outcome.report.id;
   } catch (error) {

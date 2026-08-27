@@ -19,9 +19,19 @@ import {
 } from "@/lib/validations/business-idea";
 import { submitBusinessIdeaAction } from "@/features/business-ideas/actions";
 import type { Project } from "@/types/database";
+import type { IdeaDraft } from "@/features/business-ideas/draft";
 
 interface IdeaFormProps {
   projects: Project[];
+  /**
+   * The idea this customer already submitted through the funnel, if any.
+   *
+   * Prefilling matters more than it looks: without it somebody who wrote out
+   * their idea on the marketing site arrived at a blank form, and the draft
+   * saved on their behalf stayed a draft forever while a retype forked a
+   * second row. See `draft.ts`.
+   */
+  draft?: IdeaDraft | null;
 }
 
 /** Section wrapper so the long form stays scannable and consistently spaced. */
@@ -47,7 +57,7 @@ function FormSection({
   );
 }
 
-export function IdeaForm({ projects }: IdeaFormProps) {
+export function IdeaForm({ projects, draft = null }: IdeaFormProps) {
   const [state, formAction] = useActionState(
     submitBusinessIdeaAction,
     idleState,
@@ -60,6 +70,25 @@ export function IdeaForm({ projects }: IdeaFormProps) {
         <FormAlert variant="error">{state.message}</FormAlert>
       ) : null}
 
+      {draft ? (
+        <>
+          {/*
+            Carried so the run updates the draft the funnel already created
+            rather than inserting a second idea beside it — which would leave
+            the customer's lead pointing at a row that never gets validated.
+          */}
+          <input type="hidden" name="draftIdeaId" value={draft.id} />
+          <div className="flex items-start gap-2.5 rounded-xl border border-line-strong bg-fill-1 px-4 py-3 text-sm text-foreground">
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" />
+            <span>
+              Filled in from the idea you already submitted. Add your country,
+              business model and budget — the three things the analysis needs
+              that the first form did not ask for — then validate.
+            </span>
+          </div>
+        </>
+      ) : null}
+
       <FormSection
         title="The basics"
         description="Tell us what you're building and who it's for."
@@ -69,6 +98,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
           <Input
             id="businessName"
             name="businessName"
+            defaultValue={draft?.businessName ?? ""}
             placeholder="Acme Analytics"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.businessName)}
@@ -86,6 +116,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
           <Textarea
             id="ideaDescription"
             name="ideaDescription"
+            defaultValue={draft?.ideaDescription ?? ""}
             rows={6}
             placeholder="Describe the problem you're solving, your solution, and what makes it different. The more detail you give, the sharper the analysis."
             className="mt-1.5"
@@ -115,6 +146,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
           <Input
             id="industry"
             name="industry"
+            defaultValue={draft?.industry ?? ""}
             placeholder="Fintech"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.industry)}
@@ -139,6 +171,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
           <Textarea
             id="targetAudience"
             name="targetAudience"
+            defaultValue={draft?.targetAudience ?? ""}
             rows={2}
             placeholder="Small business owners with 5-50 employees who manage invoicing manually."
             className="mt-1.5"
@@ -175,7 +208,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
             id="currentStage"
             name="currentStage"
             className="mt-1.5"
-            defaultValue="idea"
+            defaultValue={draft?.currentStage ?? "idea"}
           >
             {BUSINESS_STAGES.map((stage) => (
               <option key={stage} value={stage}>
@@ -254,6 +287,7 @@ export function IdeaForm({ projects }: IdeaFormProps) {
           <Textarea
             id="additionalNotes"
             name="additionalNotes"
+            defaultValue={draft?.additionalNotes ?? ""}
             rows={3}
             placeholder="Traction, team background, constraints, or anything else worth knowing."
             className="mt-1.5"

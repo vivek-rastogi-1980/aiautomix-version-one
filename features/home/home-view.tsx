@@ -129,6 +129,18 @@ const PAGE_CSS = `
       [style*="padding:120px 64px 160px"] { padding-left: 20px !important; padding-right: 20px !important; }
       [style*="padding:56px 48px"] { padding-left: 24px !important; padding-right: 24px !important; }
     }
+    @media (max-width: 640px) {
+      /* The carousel arrows take 42px each plus their 16px gaps — 116px of
+         a 335px row, which left the track narrower than one card and made
+         the section read as a cropped strip. Touch scrolls the track
+         directly, so the arrows are redundant on a phone. */
+      .r-trending-arrow { display: none !important; }
+      /* The hero subheading reserves 200px below itself for the ticket
+         cards to fly into. Those cards are not rendered below 1100px, so
+         on a phone it is 200px of nothing between the subheading and the
+         paragraph that follows. */
+      [style*="margin:0 0 200px"] { margin-bottom: 72px !important; }
+    }
     @media (max-height: 700px) {
       [data-zoom-img] { display: none !important; }
     }
@@ -1014,27 +1026,44 @@ class HomeController {
     );
     const eased = 1 - Math.pow(1 - p, 3);
 
+    // The hero pins itself for REVEAL_DISTANCE extra pixels so the flanking
+    // ticket cards can travel out from behind the title as the page scrolls.
+    //
+    // That stage is `display: none` whenever rScale is 0 — every viewport
+    // under 1100px. The pin was not made conditional with it, so on a phone
+    // the first 860px of scrolling moved nothing: the visitor swipes two or
+    // three times against a hero that will not budge, decides the page is
+    // broken, and only then reaches real content. Pin only where the reveal
+    // it exists for is actually rendered; everywhere else the hero is an
+    // ordinary block that scrolls on the first swipe.
+    const heroReveals = rScale > 0;
     const heroPinWrapStyle = {
       position: "relative",
       width: "100%",
       boxSizing: "border-box",
-      height:
-        "calc(clamp(950px, 100vh + 100px, 2400px) + " +
-        this.REVEAL_DISTANCE +
-        "px)",
+      height: heroReveals
+        ? "calc(clamp(950px, 100vh + 100px, 2400px) + " +
+          this.REVEAL_DISTANCE +
+          "px)"
+        : "auto",
     };
     const heroInnerStyle = {
-      position: "sticky",
+      position: heroReveals ? "sticky" : "relative",
       top: 0,
       width: "100%",
-      height: "clamp(950px, calc(100vh + 100px), 2400px)",
+      height: heroReveals
+        ? "clamp(950px, calc(100vh + 100px), 2400px)"
+        : "auto",
+      // Without the pinned height the hero should still fill the first screen
+      // rather than ending halfway up it.
+      minHeight: heroReveals ? undefined : "calc(100vh - 80px)",
       overflow: "hidden",
       boxSizing: "border-box",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "flex-start",
-      padding: "72px 24px 100px",
+      padding: heroReveals ? "72px 24px 100px" : "56px 20px 72px",
       textAlign: "center",
     };
 
@@ -1992,6 +2021,14 @@ class HomeController {
         link: "/services",
       },
     ];
+    // A 440px card with flexShrink 0 is wider than the phone it is being
+    // shown on, so the carousel spilled past the right edge and the arrows
+    // scrolled a track the viewport could not contain. Cap the card to the
+    // space actually available — the section gutter drops to 20px a side
+    // below 640px, so that is what the card has to fit inside.
+    const trendingGutter = vw < 640 ? 20 : vw < 1024 ? 32 : 64;
+    const trendingCardW = Math.max(Math.min(440, vw - trendingGutter * 2 - 16), 200);
+    const trendingImgH = Math.round(trendingCardW * (320 / 440));
     const trendingCards = trendingDefs.map((t?: any, i?: any) => ({
       label: t.label,
       icon: t.icon,
@@ -2007,7 +2044,7 @@ class HomeController {
       cardRef: this.trendingCardRef(i),
       cardStyle: {
         flexShrink: 0,
-        width: "440px",
+        width: trendingCardW + "px",
         display: "flex",
         flexDirection: "column",
         gap: "12px",
@@ -2017,7 +2054,7 @@ class HomeController {
       imgWrapStyle: {
         position: "relative",
         width: "100%",
-        height: "320px",
+        height: trendingImgH + "px",
         borderRadius: "18px",
         overflow: "hidden",
         background: "#14151f",
@@ -3024,6 +3061,15 @@ class HomeController {
           validateSubmitError: "",
         });
 
+        // Posts to /api/leads via `submitLead`, deliberately.
+        //
+        // That endpoint mints the activation link for the two funnel sources
+        // itself — see the note in app/api/leads/route.ts — so this modal does
+        // get the visitor into the product. Routing it at
+        // /api/onboarding/validate-idea instead would work too and would carry
+        // the funnel's extra fields, its idempotency key and its IDEA_SUBMITTED
+        // event, but that is a change of approach rather than a bug fix and it
+        // is not made here.
         void submitLead(
           "idea-validation",
           {
@@ -3434,14 +3480,22 @@ export function HomeView() {
                       margin: "0 0 10px",
                     }}
                   >
-                    {"Your validation is running."}
+                    {"We have your idea."}
                   </h3>
+                  {/*
+                    What this step actually does. The old copy said "Your
+                    validation is running" and promised "your free score and
+                    full report" by email — neither of which happens here:
+                    submitting captures the lead and emails an activation
+                    link, and the report exists only once the customer runs
+                    the validator from their dashboard.
+                  */}
                   <p
                     style={{ fontSize: "15px", color: "#8A87A0", margin: "0" }}
                   >
-                    {"We'll email your free score and full report to "}
+                    {"Check your inbox — we have sent "}
                     {validateForm.email}
-                    {" shortly."}
+                    {" a secure link to open your workspace."}
                   </p>
                 </div>
               ) : null}
@@ -4492,6 +4546,7 @@ export function HomeView() {
           <div style={asStyle(trendingRowWrapStyle)}>
             <div
               onClick={trendingScrollLeft}
+              className="r-trending-arrow"
               style={asStyle(trendingArrowStyle("left"))}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -4591,6 +4646,7 @@ export function HomeView() {
             </div>
             <div
               onClick={trendingScrollRight}
+              className="r-trending-arrow"
               style={asStyle(trendingArrowStyle("right"))}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">

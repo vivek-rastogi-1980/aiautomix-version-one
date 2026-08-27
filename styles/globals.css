@@ -126,3 +126,43 @@ body {
       color 0.2s ease;
   }
 }
+
+/*
+ * -----------------------------------------------------------------------
+ * Responsive gutters for the migrated design pages.
+ * -----------------------------------------------------------------------
+ * Twenty-seven marketing views set their section padding inline with a
+ * hardcoded 64px on both sides — 26 distinct shorthands, from "48px 64px"
+ * to "140px 64px 160px". On a 375px phone that spends 128px of a 375px
+ * screen on empty margin and pushes the contents past the right edge. Most
+ * of those files carry no media query at all, so nothing corrected it.
+ *
+ * This lives in globals rather than in each page's scoped <PageStyles>
+ * block for the reason stated at the top of this file: it is a rule shared
+ * by every migrated page, and 27 copies of it would drift.
+ *
+ * Matched by attribute substring because the declarations are inline style
+ * attributes — a plain rule cannot outrank them, and there is no class to
+ * hook. React serialises the shorthand without a space after the colon, so
+ * "px 64px" is the horizontal component of every one of those paddings.
+ * Verified against the full source: no other property in any view uses a
+ * value containing "px 64px", so this cannot reach a box-shadow or margin.
+ * Keep it that way — a `margin: 20px 64px` added later would be caught by
+ * this selector and have its padding overridden instead.
+ */
+@media (max-width: 1024px) {
+  [style*="px 64px"],
+  [style*="padding:0 64px"],
+  [style*="padding:64px"] {
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+  }
+}
+@media (max-width: 640px) {
+  [style*="px 64px"],
+  [style*="padding:0 64px"],
+  [style*="padding:64px"] {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
