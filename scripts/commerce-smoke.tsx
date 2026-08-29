@@ -423,6 +423,48 @@ function main(): void {
     "failing open is worst exactly when load is highest",
   );
 
+
+  // --- Every workspace has a commercial identity ----------------------------
+  //
+  // 0007 backfilled the workspaces that existed when it ran and nothing kept
+  // the invariant afterwards, so every workspace created since had no
+  // subscription row. `entitlement_consume` returns 'no_subscription' for
+  // those, which refuses every feature: the customer submits an idea, presses
+  // Validate and is told "No plan is assigned to this workspace yet", while
+  // the dashboard shows "Plan information unavailable". 0029 makes it a
+  // trigger so it holds for workspaces created by any path.
+  const identityMigration = readFileSync(
+    path.join(process.cwd(), "supabase/migrations/0029_workspace_commercial_identity.sql"),
+    "utf8",
+  );
+  check(
+    "a new workspace is given its commercial identity by a trigger",
+    /create trigger workspaces_provision_commercial_identity[\s\S]{0,120}after insert on public\.workspaces/.test(
+      identityMigration,
+    ),
+    "a backfill alone only holds until the next workspace is created",
+  );
+  check(
+    "the trigger creates both the subscription and the credit account",
+    /insert into public\.subscriptions[\s\S]{0,200}values \(new\.id, 'free', 'active'\)/.test(
+      identityMigration,
+    ) &&
+      /insert into public\.credit_accounts[\s\S]{0,120}values \(new\.id\)/.test(
+        identityMigration,
+      ),
+  );
+  check(
+    "it runs security definer, because the customer cannot write those tables",
+    /function public\.workspace_provision_commercial_identity[\s\S]{0,200}security definer/.test(
+      identityMigration,
+    ),
+    "subscriptions and credit_accounts carry SELECT policies only",
+  );
+  check(
+    "and it is idempotent, so the backfill cannot collide with the trigger",
+    (identityMigration.match(/on conflict \(workspace_id\) do nothing/g) ?? [])
+      .length >= 3,
+  );
   // --- Report ---------------------------------------------------------------
   console.log(results.join("\n"));
   const total = results.length;
