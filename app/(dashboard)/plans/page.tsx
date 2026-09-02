@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, NotebookPen } from "lucide-react";
+import { ArrowRight, NotebookPen, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getBusinessPlans } from "@/features/business-plans/data";
+import {
+  getBusinessPlans,
+  getPlannedValidationReportIds,
+} from "@/features/business-plans/data";
+import { getBusinessIdeas, getReports } from "@/features/reports/data";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -31,9 +35,23 @@ const STATUS_BADGE: Record<
 export default async function PlansPage() {
   const user = await requireUser();
   const { workspace, role } = await getWorkspaceContext(user.id);
-  const plans = await getBusinessPlans(workspace.id);
+  const [plans, reports, ideas, plannedReportIds] = await Promise.all([
+    getBusinessPlans(workspace.id),
+    getReports(user.id),
+    getBusinessIdeas(user.id),
+    getPlannedValidationReportIds(workspace.id),
+  ]);
 
   const editable = canEdit(role);
+
+  // Validated ideas that have not been turned into a plan yet. All four reads
+  // above are already scoped to this user or this workspace, so nothing here
+  // can surface another customer's report; the join is done in memory because
+  // both lists are a customer's own and small.
+  const ideaTitles = new Map(ideas.map((idea) => [idea.id, idea.title]));
+  const readyToPlan = reports
+    .filter((report) => !plannedReportIds.has(report.id))
+    .slice(0, 4);
 
   return (
     <div className="flex flex-col gap-8">
@@ -103,8 +121,15 @@ export default async function PlansPage() {
                           {plan.summary}
                         </p>
                       ) : null}
-                      <div className="mt-2.5">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <Badge variant={status.variant}>{status.label}</Badge>
+                        {/* Presence of the link IS the flag — migration 0030
+                            deliberately adds no separate `source` column. */}
+                        {plan.validation_report_id ? (
+                          <Badge variant="completed">
+                            Based on validated idea
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     <ArrowRight className="mt-1 size-5 shrink-0 text-muted-strong transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -115,6 +140,49 @@ export default async function PlansPage() {
           })}
         </ul>
       )}
+
+      {/* --- Validated ideas with no plan yet -------------------------------
+          Lightweight on purpose (§17): a short prompt, not a second dashboard.
+          Hidden entirely when there is nothing to act on, so it never becomes
+          empty furniture. */}
+      {editable && readyToPlan.length > 0 ? (
+        <section className="flex flex-col gap-4">
+          <div>
+            <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+              Ready to build a business plan?
+            </h2>
+            <p className="text-sm text-muted">
+              These validated ideas do not have a business plan yet.
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {readyToPlan.map((report) => (
+              <li key={report.id}>
+                <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-base font-bold tracking-tight text-foreground">
+                      {ideaTitles.get(report.business_idea_id) ??
+                        "Business idea"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Validation score {report.score}/100 · Validated{" "}
+                      {formatDate(report.created_at)}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/plans/new?validation_report_id=${report.id}`}
+                    className={cn(
+                      buttonVariants({ variant: "secondary", size: "md" }),
+                    )}
+                  >
+                    <Sparkles className="size-4" /> Create business plan
+                  </Link>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

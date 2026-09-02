@@ -15,6 +15,7 @@ import {
   saveSectionRevision,
   VersionConflictError,
 } from "@/features/business-plans/data";
+import { getReport } from "@/features/reports/data";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { EntitlementError } from "@/features/commerce/errors";
 import { canEdit } from "@/features/workspaces/roles";
@@ -75,6 +76,7 @@ export async function generateBusinessPlanAction(
     additionalNotes: formData.get("additionalNotes") ?? "",
     projectId: formData.get("projectId") ?? "",
     businessIdeaId: formData.get("businessIdeaId") ?? "",
+    validationReportId: formData.get("validationReportId") ?? "",
   });
 
   if (!parsed.success) {
@@ -88,12 +90,24 @@ export async function generateBusinessPlanAction(
     return errorState(new AiError("AI_NOT_CONFIGURED").userMessage);
   }
 
+  // §20: a `validationReportId` arriving in a form post is a claim, not a fact.
+  // Re-read it under the caller's OWN session before it is persisted —
+  // `getReport` filters on `user_id` and runs under RLS, so a report belonging
+  // to anyone else resolves to null. A forged or stale id therefore drops the
+  // link silently instead of attaching this plan to a report the caller cannot
+  // see; it never widens access, and never fails the generation.
+  let validationReportId: string | undefined;
+  if (parsed.data.validationReportId) {
+    const source = await getReport(user.id, parsed.data.validationReportId);
+    validationReportId = source ? parsed.data.validationReportId : undefined;
+  }
+
   let planId: string;
   try {
     const outcome = await generateBusinessPlan({
       userId: user.id,
       workspaceId: workspace.id,
-      input: parsed.data,
+      input: { ...parsed.data, validationReportId },
     });
     planId = outcome.plan.id;
   } catch (error) {

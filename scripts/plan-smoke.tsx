@@ -22,6 +22,11 @@ import {
   getPlanSection,
   toPlanSectionContents,
 } from "@/features/business-plans/sections";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import type { BusinessValidatorReport } from "@/features/ai/schemas/business-validator";
+import { validationReportToBusinessPlanInput } from "@/features/business-plans/from-validation";
 import { VALID_PLAN_DOCUMENT } from "@/scripts/fixtures";
 import type { BusinessPlan, BusinessPlanSection } from "@/types/database";
 
@@ -39,6 +44,9 @@ const PLAN: BusinessPlan = {
   user_id: "user-1",
   project_id: null,
   business_idea_id: null,
+  // Migration 0030. Null here on purpose: this fixture is a plan created
+  // directly, which is the case that must keep working unchanged.
+  validation_report_id: null,
   title: VALID_PLAN_DOCUMENT.title,
   summary: VALID_PLAN_DOCUMENT.sections.executiveSummary,
   status: "ready",
@@ -187,6 +195,249 @@ async function main(): Promise<void> {
   );
 
   writeFileSync("plan-smoke-output.pdf", buffer);
+
+  // =========================================================================
+  // Validation report -> business plan (migration 0030)
+  //
+  // The mapping is a pure function, so these are real unit tests rather than
+  // source assertions. The security, entitlement and idempotency properties
+  // live in other files and are asserted by parsing them, the same way the
+  // commerce suite does.
+  // =========================================================================
+
+  const REPORT: BusinessValidatorReport = {
+    overallScore: 82,
+    recommendation: "go",
+    summary: "Strong demand among small clinics.",
+    problemStatement: "Scheduling is manual and error-prone.",
+    targetMarket: "UK dental practices with 2-10 chairs.",
+    customerPersona: "Practice managers who own the diary.",
+    marketOpportunity: "Roughly 12,000 practices, low software penetration.",
+    scoreBreakdown: {
+      marketDemand: 84,
+      problemSeverity: 80,
+      revenuePotential: 78,
+      competition: 60,
+      feasibility: 88,
+      innovation: 70,
+      risk: 65,
+    },
+    swot: {
+      strengths: ["Clear pain point", "Founder is a dentist"],
+      weaknesses: ["No engineering team"],
+      opportunities: ["NHS digitisation push"],
+      threats: ["Incumbent PMS vendors"],
+    },
+    revenueModels: [
+      {
+        name: "Per-seat SaaS",
+        description: "Monthly per practice.",
+        potential: "high",
+      },
+    ],
+    risks: [
+      {
+        title: "Data protection",
+        description: "Patient data is sensitive.",
+        severity: "high",
+        mitigation: "UK-hosted, DPA in place.",
+      },
+    ],
+    recommendations: [
+      {
+        title: "Interview 20 practices",
+        description: "Confirm willingness to pay.",
+        priority: "high",
+      },
+    ],
+    nextSteps: [
+      {
+        title: "Build a prototype",
+        description: "One clinic, one diary.",
+        timeframe: "6 weeks",
+      },
+    ],
+  };
+
+  const IDEA_PAYLOAD = {
+    businessName: "DentalFlow AI",
+    ideaDescription:
+      "An AI scheduling assistant for dental practices that fills cancellations automatically and keeps the diary full.",
+    industry: "Healthcare software",
+    country: "United Kingdom",
+    targetAudience: "Independent dental practices",
+    businessModel: "saas",
+    currentStage: "idea",
+    estimatedBudget: 25000,
+    timeline: "6 months",
+    competitors: "Dentally, Software of Excellence",
+    additionalNotes: "Founder is a practising dentist.",
+  };
+
+  const prefill = validationReportToBusinessPlanInput({
+    report: REPORT,
+    ideaPayload: IDEA_PAYLOAD,
+    businessIdeaId: "11111111-1111-4111-8111-111111111111",
+    ideaTitle: "DentalFlow AI",
+  });
+
+  // --- The customer's own submission is carried across verbatim ------------
+  for (const field of [
+    "businessName",
+    "ideaDescription",
+    "industry",
+    "country",
+    "targetAudience",
+    "businessModel",
+    "currentStage",
+    "estimatedBudget",
+    "timeline",
+    "competitors",
+  ] as const) {
+    check(
+      `prefill carries ${field} from the original submission`,
+      prefill.values[field] === IDEA_PAYLOAD[field],
+      "the customer's own words must not be replaced by generated prose",
+    );
+  }
+  check(
+    "prefill links the source business idea",
+    prefill.values.businessIdeaId === "11111111-1111-4111-8111-111111111111",
+  );
+
+  // --- Report findings reach the brief -------------------------------------
+  const notes = prefill.values.additionalNotes ?? "";
+  check("findings include the score", notes.includes("82/100"));
+  check(
+    "findings include the problem statement",
+    notes.includes("Scheduling is manual"),
+  );
+  check(
+    "findings include SWOT",
+    notes.includes("STRENGTHS") && notes.includes("THREATS"),
+  );
+  check(
+    "findings include recommendations",
+    notes.includes("Interview 20 practices"),
+  );
+  check(
+    "the customer's own notes survive alongside the findings",
+    notes.includes("Founder is a practising dentist."),
+  );
+  check(
+    "the brief stays inside the schema's 2,000 character ceiling",
+    notes.length <= 2_000,
+    `${notes.length} chars`,
+  );
+
+  // --- Nothing is fabricated ------------------------------------------------
+  check(
+    "fundingGoal is left blank rather than invented",
+    prefill.values.fundingGoal === undefined &&
+      prefill.blank.includes("fundingGoal"),
+  );
+  check(
+    "teamSummary is left blank rather than invented",
+    prefill.values.teamSummary === undefined &&
+      prefill.blank.includes("teamSummary"),
+  );
+
+  // --- A legacy payload degrades instead of throwing -----------------------
+  const legacy = validationReportToBusinessPlanInput({
+    report: REPORT,
+    ideaPayload: { businessName: "Old Shape" },
+    businessIdeaId: null,
+    ideaTitle: "Old Shape",
+  });
+  check(
+    "a partial idea payload still yields a usable prefill",
+    legacy.values.businessName === "Old Shape" &&
+      (legacy.values.additionalNotes ?? "").includes("82/100"),
+    "an old stored payload must not crash the page",
+  );
+  const empty = validationReportToBusinessPlanInput({
+    report: REPORT,
+    ideaPayload: null,
+    businessIdeaId: null,
+    ideaTitle: null,
+  });
+  check(
+    "a missing idea payload does not throw",
+    typeof empty.values.additionalNotes === "string",
+  );
+
+  // --- Security, entitlement and idempotency properties --------------------
+  const read = (rel: string) =>
+    readFileSync(path.join(process.cwd(), rel), "utf8");
+  const planActions = read("features/business-plans/actions.ts");
+  const planService = read("features/ai/services/business-plan.ts");
+  const ctaSource = read(
+    "features/business-plans/create-plan-from-validation-link.tsx",
+  );
+  const newPage = read("app/(dashboard)/plans/new/page.tsx");
+  const linkMigration = read(
+    "supabase/migrations/0030_business_plan_validation_report_link.sql",
+  );
+
+  check(
+    "the posted validation_report_id is re-read under the caller's session",
+    planActions.includes("getReport(user.id, parsed.data.validationReportId)"),
+    "a browser-supplied report id is a claim, not a fact",
+  );
+  check(
+    "an unresolvable report id drops the link instead of widening access",
+    planActions.includes(
+      "validationReportId = source ? parsed.data.validationReportId : undefined",
+    ),
+  );
+  check(
+    "the prefill page resolves the report through the user-scoped reader",
+    newPage.includes("getReport(user.id, requestedReportId)"),
+  );
+  check(
+    "the CTA creates nothing - it is a link, not a mutation",
+    !/useTransition|fetch\(|method="post"/i.test(ctaSource) &&
+      ctaSource.includes("/plans/new?validation_report_id="),
+    "no write on click means double-clicks cannot duplicate a plan",
+  );
+  check(
+    "plan generation still consumes the existing entitlement",
+    planService.includes("consumeEntitlement(") &&
+      planService.includes('"business_plan"'),
+  );
+  check(
+    "entitlement is still reserved BEFORE the model call",
+    (() => {
+      const consume = planService.indexOf("consumeEntitlement(");
+      const run = planService.indexOf("await runWorkflow");
+      return consume !== -1 && run !== -1 && consume < run;
+    })(),
+    "the validation path must not become an entitlement bypass",
+  );
+  check(
+    "the validation path adds no second entitlement mechanism",
+    !/usage_counters|entitlement_consume|usage_reservations/.test(
+      planActions,
+    ) && !/usage_counters/.test(newPage),
+  );
+  check(
+    "the duplicate check is scoped to the workspace, not just the report",
+    /getPlansForValidationReport\(\s*workspace\.id/.test(newPage),
+  );
+  check(
+    "deleting a validation report never deletes the plan built from it",
+    linkMigration.includes("on delete set null"),
+  );
+  check(
+    "the link column is indexed for the lookups the product performs",
+    linkMigration.includes(
+      "create index if not exists business_plans_validation_report_idx",
+    ),
+  );
+  check(
+    "no separate source column duplicates the link",
+    !/add column if not exists source/.test(linkMigration),
+  );
 
   console.log("\n" + results.join("\n"));
   const failed = results.filter((r) => r.startsWith("FAIL")).length;
