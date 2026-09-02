@@ -433,3 +433,70 @@ export async function recentCreditActivity(
     .limit(limit);
   return data ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Workspace plan assignment  (migration 0029)
+// ---------------------------------------------------------------------------
+
+export interface PlanHistoryEntry {
+  id: string;
+  old_plan: string;
+  new_plan: string;
+  reason: string | null;
+  created_at: string;
+  changed_by_role: string | null;
+  changed_by_email: string | null;
+}
+
+/**
+ * A workspace's plan transitions, newest first.
+ *
+ * Goes through `admin_workspace_plan_history` rather than selecting the table
+ * directly so the actor's email arrives in the same round trip — `auth.users`
+ * is not readable from a client session, and joining it here would otherwise
+ * mean a second query per row.
+ *
+ * Returns [] rather than throwing when the caller lacks `workspaces.read`: the
+ * page already renders a NoPermission panel for that case, and an exception
+ * would take the whole detail view down over one absent section.
+ */
+export async function getWorkspacePlanHistory(
+  workspaceId: string,
+  limit = 20,
+): Promise<PlanHistoryEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_workspace_plan_history", {
+    p_workspace_id: workspaceId,
+    p_limit: limit,
+  });
+
+  if (error) {
+    console.error("[admin] plan history unavailable", error.message);
+    return [];
+  }
+  return Array.isArray(data) ? (data as unknown as PlanHistoryEntry[]) : [];
+}
+
+/**
+ * The plans a SUPER_ADMIN may assign from the workspace detail screen.
+ *
+ * The three self-serve tiers, per the Phase 14 brief. `professional` and
+ * `enterprise` are negotiated rather than assigned from this screen, so they
+ * are not offered here — but note that the restriction is presentation only:
+ * `admin_change_workspace_plan` accepts any plan id that exists in the catalog,
+ * so widening this list needs no migration and no change to the function.
+ *
+ * Names and prices come from the `plans` table, never from a literal here, so
+ * this cannot drift from the catalog the customer sees on /pricing.
+ */
+export const ASSIGNABLE_PLAN_IDS = ["free", "starter", "growth"] as const;
+
+export async function listAssignablePlans(): Promise<PlanRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("plans")
+    .select("*")
+    .in("id", [...ASSIGNABLE_PLAN_IDS])
+    .order("sort_order", { ascending: true });
+  return data ?? [];
+}

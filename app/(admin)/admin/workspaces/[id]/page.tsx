@@ -7,6 +7,8 @@ import {
   getWorkspaceDetail,
   listCreditTransactions,
   listAuditLogs,
+  getWorkspacePlanHistory,
+  listAssignablePlans,
 } from "@/features/admin/data";
 import { pageParams } from "@/features/admin/query";
 import { PageHeader, Stat, NoPermission } from "@/features/admin/ui";
@@ -14,12 +16,15 @@ import {
   WorkspaceSuspendControl,
   CreditControls,
 } from "@/features/admin/user-controls";
+import { WorkspacePlanControl } from "@/features/admin/plan-controls";
+import { getEntitlementUsage } from "@/features/commerce/enforcement";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/features/commerce/subscriptions";
 import { ROLE_LABELS as WORKSPACE_ROLE_LABELS } from "@/features/workspaces/roles";
 import type { WorkspaceRole } from "@/types/database";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Workspace" };
 export const dynamic = "force-dynamic";
@@ -45,17 +50,42 @@ export default async function AdminWorkspaceDetail({
     usage,
   } = detail;
 
-  const [ledger, history] = await Promise.all([
-    context.has("credits.read")
-      ? listCreditTransactions(pageParams("1", "10"), { workspaceId: id })
-      : Promise.resolve(null),
-    context.has("audit.read")
-      ? listAuditLogs(pageParams("1", "10"), {
-          entityType: "workspace",
-          entityId: id,
-        })
-      : Promise.resolve(null),
-  ]);
+  // Each read is gated on the permission that governs it, so a SUPPORT or
+  // ANALYST viewer gets the sections they are entitled to rather than an error
+  // page. `plans.manage` is SUPER_ADMIN-only, which is what hides the plan
+  // control from everyone else.
+  const canAssignPlans = context.has("plans.manage");
+
+  const [ledger, history, planHistory, assignablePlans, entitlementUsage] =
+    await Promise.all([
+      context.has("credits.read")
+        ? listCreditTransactions(pageParams("1", "10"), { workspaceId: id })
+        : Promise.resolve(null),
+      context.has("audit.read")
+        ? listAuditLogs(pageParams("1", "10"), {
+            entityType: "workspace",
+            entityId: id,
+          })
+        : Promise.resolve(null),
+      getWorkspacePlanHistory(id),
+      canAssignPlans ? listAssignablePlans() : Promise.resolve([]),
+      context.has("usage.read")
+        ? getEntitlementUsage(id)
+        : Promise.resolve(null),
+    ]);
+
+  // The same two features the customer's own dashboard leads with, so an
+  // operator on a support call is looking at the numbers the customer is
+  // quoting. Read through `entitlement_usage`, which returns each feature's
+  // consumption alongside the CURRENT limit — so this cannot show 17 / 25 while
+  // the engine enforces something else.
+  const QUOTA_ROWS = [
+    { feature: "business_idea_validation", label: "Validation usage" },
+    { feature: "business_plan", label: "Business plans" },
+  ];
+  const usageByFeature = new Map(
+    (entitlementUsage?.features ?? []).map((f) => [f.feature, f]),
+  );
 
   const suspended = Boolean(workspace.suspended_at);
 
@@ -128,6 +158,99 @@ export default async function AdminWorkspaceDetail({
               <p className="mt-4 text-sm text-muted">
                 No subscription record for this workspace.
               </p>
+            )}
+
+            {/* Allowance, against the limit currently in force. */}
+            {entitlementUsage ? (
+              <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line-strong pt-4 sm:grid-cols-2">
+                {QUOTA_ROWS.map((row) => {
+                  const data = usageByFeature.get(row.feature);
+                  if (!data) return null;
+                  // A downgrade can leave used above limit. Showing 80 / 3
+                  // rather than clamping is the point: it is the true state,
+                  // and it explains why requests are being refused.
+                  const over = data.limit !== null && data.used > data.limit;
+                  return (
+                    <div key={row.feature}>
+                      <dt className="text-xs uppercase tracking-wider text-muted">
+                        {row.label}
+                      </dt>
+                      <dd
+                        className={cn(
+                          "mt-1 text-sm",
+                          over ? "text-red-300" : "text-foreground",
+                        )}
+                      >
+                        {data.used} /{" "}
+                        {data.limit === null ? "Unlimited" : data.limit}
+                        {over ? " — over limit" : ""}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            ) : null}
+
+            {canAssignPlans && subscription ? (
+              <WorkspacePlanControl
+                workspaceId={workspace.id}
+                currentPlanId={subscription.plan_id}
+                currentPlanName={plan?.name ?? subscription.plan_id}
+                plans={assignablePlans.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                }))}
+              />
+            ) : null}
+          </Card>
+
+          {/* --- Plan history --------------------------------------------- */}
+          <Card className="p-6">
+            <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
+              Plan history
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Every plan transition, newest first. Append-only — entries cannot
+              be edited or removed.
+            </p>
+            {planHistory.length === 0 ? (
+              <p className="mt-4 text-sm text-muted">
+                No plan changes recorded.
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wider text-muted">
+                    <tr>
+                      <th className="pb-2 pr-4 font-medium">Change</th>
+                      <th className="pb-2 pr-4 font-medium">By</th>
+                      <th className="pb-2 pr-4 font-medium">Reason</th>
+                      <th className="pb-2 font-medium">When</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-strong">
+                    {planHistory.map((entry) => (
+                      <tr key={entry.id}>
+                        <td className="py-2 pr-4 text-foreground">
+                          {entry.old_plan} &rarr; {entry.new_plan}
+                        </td>
+                        <td className="py-2 pr-4 text-muted">
+                          {entry.changed_by_email ?? "—"}
+                          {entry.changed_by_role
+                            ? ` (${entry.changed_by_role})`
+                            : ""}
+                        </td>
+                        <td className="py-2 pr-4 text-muted">
+                          {entry.reason ?? "—"}
+                        </td>
+                        <td className="py-2 text-muted">
+                          {formatDateTime(entry.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
 
