@@ -9,6 +9,37 @@ const NAV_CSS = `
   @keyframes beamFlicker { 0%,100% { opacity: 0.85; } 45% { opacity: 1; } 50% { opacity: 0.7; } 55% { opacity: 1; } }
   @keyframes navLogoFloat { 0%,100% { transform: translateY(0); filter: drop-shadow(0 0 10px rgba(255,255,255,0.85)) drop-shadow(0 0 18px rgba(180,150,255,0.5)) brightness(1.1); } 50% { transform: translateY(-4px); filter: drop-shadow(0 0 16px rgba(255,255,255,1)) drop-shadow(0 0 26px rgba(180,150,255,0.7)) brightness(1.25); } }
   .site-menu-link:hover { background: #E4E3FA; }
+  /* ---------------------------------------------------------------------
+     Responsive header.
+
+     The bar is a single non-wrapping flex row, so at desktop sizing a
+     signed-in visitor carries four pills — Dashboard, Log out, Let's Talk,
+     MENU — plus a 52px logo and 128px of gutter. That totals roughly 600px
+     and cannot fit a phone: the row overflows and the pills collide, which
+     is the "logout layout" disorder.
+
+     Desktop is left exactly as it was. Only these overrides run below the
+     breakpoints, and they use !important because everything above is an
+     inline style attribute, which a plain rule cannot outrank.
+     --------------------------------------------------------------------- */
+  @media (max-width: 900px) {
+    .site-nav-bar { padding: 14px 20px !important; }
+    .site-nav-actions { gap: 8px !important; }
+    .site-nav-pill { padding: 9px 14px !important; font-size: 12px !important; }
+  }
+  @media (max-width: 560px) {
+    /* "Let's Talk" points at /contact, which the MENU overlay already lists
+       as Contact. Dropping the duplicate is what buys the remaining three
+       pills room to sit on one line rather than stacking. */
+    .site-nav-talk { display: none !important; }
+    .site-nav-pill { padding: 8px 12px !important; font-size: 11.5px !important; }
+    .site-nav-logo { width: 42px !important; height: 42px !important; }
+    .site-nav-auth-placeholder { width: 58px !important; }
+  }
+  @media (max-width: 400px) {
+    .site-nav-bar { padding: 12px 14px !important; }
+    .site-nav-pill { padding: 7px 10px !important; font-size: 11px !important; }
+  }
 `;
 
 /**
@@ -25,6 +56,7 @@ export function SiteNav() {
     <>
       <style dangerouslySetInnerHTML={{ __html: NAV_CSS }} />
       <div
+        className="site-nav-bar"
         style={{
           position: "sticky",
           top: "0",
@@ -48,6 +80,7 @@ export function SiteNav() {
           }}
         >
           <div
+            className="site-nav-logo"
             style={{
               position: "relative",
               width: "52px",
@@ -122,10 +155,14 @@ export function SiteNav() {
             />
           </div>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          className="site-nav-actions"
+          style={{ display: "flex", alignItems: "center", gap: "10px" }}
+        >
           <AuthNavLinks />
           <Link
             href="/contact"
+            className="site-nav-pill site-nav-talk"
             style={{
               padding: "11px 20px",
               borderRadius: "100px",
@@ -141,6 +178,7 @@ export function SiteNav() {
           </Link>
           <div
             onClick={toggleMenu}
+            className="site-nav-pill"
             style={{
               padding: "11px 22px",
               borderRadius: "100px",

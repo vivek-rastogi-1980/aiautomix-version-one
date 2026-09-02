@@ -89,6 +89,9 @@ function main(): void {
   const engine = read("features/communications/template-engine.ts");
   const service = read("features/communications/service.ts");
   const provisioning = read("features/onboarding/provisioning.ts");
+  const activation = read("features/onboarding/activation.ts");
+  const homeView = read("features/home/home-view.tsx");
+  const leadsRoute = read("app/api/leads/route.ts");
   const ideaRoute = read("app/api/onboarding/validate-idea/route.ts");
   const bookingRoute = read("app/api/onboarding/bookings/route.ts");
   const validations = read("lib/validations/onboarding.ts");
@@ -115,7 +118,7 @@ function main(): void {
   const eventCallSites = [
     ideaRoute,
     bookingRoute,
-    read("features/onboarding/activation.ts"),
+    activation,
     read("features/onboarding/validation-events.ts"),
     read("features/admin/actions.ts"),
   ].map(code);
@@ -458,6 +461,22 @@ function main(): void {
     "and no request schema has a field a client could supply one through",
     !/idempotency/i.test(code(validations)),
     "a client-supplied key is a client-supplied duplicate",
+  );
+
+  // The claim RPC inserts ACCOUNT_CREATED and WORKSPACE_CREATED itself, in the
+  // transaction that claims the lead. A second writer in activation.ts gave
+  // every activated customer a doubled timeline: the dedup it relied on was a
+  // SELECT on `lead_events`, which is admin-readable only, so it never fired
+  // for the customers it existed for.
+  check(
+    "the claim RPC is the only writer of the activation events",
+    /'ACCOUNT_CREATED'/.test(migration) && /'WORKSPACE_CREATED'/.test(migration),
+    "lead_claim_for_user inserts both, security definer",
+  );
+  check(
+    "and activation.ts does not record them a second time",
+    !/ACCOUNT_CREATED|WORKSPACE_CREATED/.test(code(activation)),
+    "an activation timeline must not say the account was created twice",
   );
 
   // =========================================================================
@@ -1006,6 +1025,29 @@ function main(): void {
       return ok !== -1 && track !== -1 && ok < track;
     })(),
     "counting attempts rather than captures overstates conversion",
+  );
+
+
+  // The same class of failure on the page that gets the most traffic. The
+  // home modal told the visitor "Your validation is running" and promised
+  // "your free score and full report" by email. Submitting does neither: it
+  // captures the lead and emails an activation link, and the report exists
+  // only once the customer runs the validator from their dashboard.
+  //
+  // The endpoint half of this was fixed in /api/leads, which now mints the
+  // activation link for the funnel sources — so the modal genuinely does get
+  // the visitor into the product. The copy was never corrected with it.
+  check(
+    "the home modal promises only what submitting actually does",
+    !/validation is running/i.test(code(homeView)) &&
+      !/free score and full report/i.test(code(homeView)),
+    "activation emails a link; the report comes after the validator runs",
+  );
+  check(
+    "and the funnel sources it posts under are the ones that mint a link",
+    /submitLead\(\s*"idea-validation"/.test(code(homeView)) &&
+      /FUNNEL_SOURCES[\s\S]{0,120}idea-validation/.test(code(leadsRoute)),
+    "a source outside that set is captured with no way into the product",
   );
 
   // =========================================================================
