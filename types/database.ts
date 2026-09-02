@@ -2269,6 +2269,24 @@ export interface Database {
         };
         Returns: undefined;
       };
+      /**
+       * Migration 0029. Updates the subscription, appends the immutable
+       * `subscription_plan_history` row and writes the admin audit row in one
+       * transaction. Requires `plans.manage`.
+       */
+      admin_change_workspace_plan: {
+        Args: {
+          p_workspace_id: string;
+          p_plan_id: string;
+          p_reason?: string | null;
+        };
+        Returns: Record<string, unknown>;
+      };
+      /** Migration 0029. A workspace's plan transitions, newest first. */
+      admin_workspace_plan_history: {
+        Args: { p_workspace_id: string; p_limit?: number | null };
+        Returns: Record<string, unknown>[];
+      };
       admin_platform_stats: {
         Args: { p_since?: string | null };
         Returns: Record<string, number | string>;

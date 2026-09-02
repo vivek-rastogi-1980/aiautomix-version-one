@@ -3,7 +3,11 @@
 import { useState, useTransition } from "react";
 
 import { cn } from "@/lib/utils";
-import { updatePlan, updateEntitlement } from "@/features/admin/actions";
+import {
+  updatePlan,
+  updateEntitlement,
+  changeWorkspacePlan,
+} from "@/features/admin/actions";
 import type { ActionResult } from "@/features/admin/actions";
 
 /**
@@ -296,6 +300,151 @@ export function EntitlementEditor({
           type="button"
           onClick={() => setOpen(false)}
           className="rounded-full px-3 py-1.5 text-sm text-muted hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+      <Result result={result} />
+    </div>
+  );
+}
+
+/**
+ * Move a workspace onto a different plan.
+ *
+ * Rendered only when the viewer holds `plans.manage`, which is SUPER_ADMIN
+ * alone in the seeded matrix. As with the editors above that is a courtesy:
+ * the Server Action re-checks it and `admin_change_workspace_plan` checks it
+ * again inside Postgres, so a lesser role that reached this control by any
+ * route still cannot commit a change.
+ *
+ * The confirmation step is not ceremony. A plan change takes effect on the very
+ * next entitlement check — there is no scheduled or end-of-period application —
+ * so the operator is told that before they commit, not after.
+ *
+ * `currentPlanId` is display only. It is never sent: the function reads the old
+ * plan from the database so the recorded transition is always the one that
+ * actually happened, even from a stale page.
+ */
+export function WorkspacePlanControl({
+  workspaceId,
+  currentPlanId,
+  currentPlanName,
+  plans,
+}: {
+  workspaceId: string;
+  currentPlanId: string;
+  currentPlanName: string;
+  plans: { id: string; name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [planId, setPlanId] = useState(currentPlanId);
+  const [reason, setReason] = useState("");
+  const [result, setResult] = useState<ActionResult | null>(null);
+  const [pending, start] = useTransition();
+
+  if (!open) {
+    return (
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setPlanId(currentPlanId);
+            setReason("");
+            setResult(null);
+            setOpen(true);
+          }}
+          className="inline-flex min-h-11 items-center rounded-full border border-line-strong px-4 text-sm text-foreground hover:bg-fill-3"
+        >
+          Change plan
+        </button>
+        <Result result={result} />
+      </div>
+    );
+  }
+
+  const target = plans.find((p) => p.id === planId);
+  const changed = planId !== currentPlanId;
+
+  return (
+    <div className="mt-4 rounded-xl border border-line-strong p-4">
+      <h3 className="font-display text-base font-bold tracking-tight text-foreground">
+        Change workspace plan
+      </h3>
+
+      <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs uppercase tracking-wider text-muted">
+            Current
+          </dt>
+          <dd className="mt-1 text-sm text-foreground">{currentPlanName}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wider text-muted">New</dt>
+          <dd className="mt-1">
+            <select
+              value={planId}
+              onChange={(e) => setPlanId(e.target.value)}
+              aria-label="New plan"
+              className={cn(INPUT, "min-h-11")}
+            >
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.id === currentPlanId ? " (current)" : ""}
+                </option>
+              ))}
+            </select>
+          </dd>
+        </div>
+      </dl>
+
+      <label className="mt-3 flex flex-col gap-1.5">
+        <span className="text-xs uppercase tracking-wider text-muted">
+          Reason (optional)
+        </span>
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. upgraded after sales call"
+          className={cn(INPUT, "min-h-11")}
+        />
+      </label>
+
+      {changed ? (
+        <p className="mt-3 rounded-lg border border-line-strong bg-fill-1 p-3 text-sm text-muted">
+          Changing this plan will immediately affect the workspace&apos;s
+          available features and monthly limits. Usage already recorded in this
+          period is kept — if the new plan&apos;s limit is lower than what has
+          been used, further requests are refused until the period resets.
+        </p>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={!changed || pending}
+          onClick={() =>
+            start(async () => {
+              const res = await changeWorkspacePlan({
+                workspaceId,
+                planId,
+                reason: reason.trim() === "" ? undefined : reason.trim(),
+              });
+              setResult(res);
+              if (res.ok) setOpen(false);
+            })
+          }
+          className="inline-flex min-h-11 items-center rounded-full bg-fill-5 px-4 text-sm font-medium text-foreground hover:bg-fill-6 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending
+            ? "Changing…"
+            : `Confirm change${target ? ` to ${target.name}` : ""}`}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="inline-flex min-h-11 items-center rounded-full px-4 text-sm text-muted hover:text-foreground"
         >
           Cancel
         </button>

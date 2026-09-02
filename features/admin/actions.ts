@@ -71,6 +71,15 @@ function toResult(
   if (/not found/i.test(raw)) {
     return { ok: false, message: "That record no longer exists." };
   }
+  if (/already on the/i.test(raw)) {
+    return { ok: false, message: "That workspace is already on this plan." };
+  }
+  if (/no subscription for this workspace/i.test(raw)) {
+    return {
+      ok: false,
+      message: "That workspace has no subscription to change.",
+    };
+  }
 
   console.error("[admin] action failed", raw);
   return {
@@ -296,6 +305,62 @@ export async function updateEntitlement(
   revalidatePath("/admin/entitlements");
   revalidatePath("/pricing");
   return toResult(error, "Entitlement updated.");
+}
+
+// ---------------------------------------------------------------------------
+// Workspace plan assignment  (migration 0029)
+// ---------------------------------------------------------------------------
+
+const workspacePlanSchema = z.object({
+  workspaceId: z.string().uuid(),
+  planId: z.string().trim().min(1).max(64),
+  reason: z.string().trim().max(500).optional(),
+});
+
+/**
+ * Move a workspace onto a different plan.
+ *
+ * `admin_change_workspace_plan` updates the subscription, writes the immutable
+ * `subscription_plan_history` row and writes the shared admin audit row in ONE
+ * transaction, so a plan change without its history is not a state this system
+ * can reach.
+ *
+ * Note what is deliberately absent: no current-plan parameter. The old value is
+ * read from the database inside the function, so a stale page or a forged
+ * request cannot make the history record a transition that did not happen.
+ *
+ * Usage counters, reservations and credits are not touched. A downgrade limits
+ * what happens next; it never rewrites what already happened, which is why a
+ * workspace can legitimately read 80 / 3 until the period rolls over.
+ *
+ * Gated on `plans.manage` — SUPER_ADMIN only in the seeded matrix. Checked here
+ * for a legible error and again inside the function, which is the real gate.
+ */
+export async function changeWorkspacePlan(
+  input: z.infer<typeof workspacePlanSchema>,
+): Promise<ActionResult> {
+  const context = await requireAdmin();
+  await assertPermission(context, "plans.manage");
+
+  const parsed = workspacePlanSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid request.",
+    };
+  }
+
+  const { workspaceId, planId, reason } = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_change_workspace_plan", {
+    p_workspace_id: workspaceId,
+    p_plan_id: planId,
+    p_reason: reason ?? null,
+  });
+
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin/workspaces");
+  return toResult(error, "Plan changed.");
 }
 
 // ---------------------------------------------------------------------------

@@ -6,13 +6,40 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { signOutAction } from "@/features/auth/actions";
+import { getProfile } from "@/features/profile/data";
+import { getWorkspaceContext } from "@/features/workspaces/data";
+import { getEntitlementUsage } from "@/features/commerce/enforcement";
+import { getPlan } from "@/features/commerce/subscriptions";
+import { AccountPanel } from "@/features/settings/account-panel";
 import { UpdateEmailForm } from "@/features/settings/update-email-form";
 import { UpdatePasswordForm } from "@/features/settings/update-password-form";
+import type { PlanId } from "@/features/commerce/types";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const user = await requireUser();
+
+  // Same resolution order the dashboard uses: the commercial state is
+  // workspace-scoped, so the workspace resolves first. `getWorkspaceContext`
+  // provisions the personal workspace on first read, so a customer arriving
+  // here before visiting the dashboard still sees a workspace rather than a
+  // gap.
+  const { workspace } = await getWorkspaceContext(user.id);
+
+  const [profile, planUsage] = await Promise.all([
+    getProfile(user.id),
+    getEntitlementUsage(workspace.id),
+  ]);
+
+  // The catalog name, not a label map — a renamed plan renames here too.
+  const plan = planUsage?.plan ? await getPlan(planUsage.plan as PlanId) : null;
+
+  // A suspended workspace is the more important fact about an account than its
+  // subscription status, so it wins when both apply.
+  const status = workspace.suspended_at
+    ? "suspended"
+    : (planUsage?.status ?? null);
 
   return (
     <div className="flex flex-col gap-8">
@@ -24,6 +51,14 @@ export default async function SettingsPage() {
       </div>
 
       <div className="flex flex-col gap-6">
+        <AccountPanel
+          name={profile?.full_name ?? null}
+          email={user.email ?? null}
+          workspaceName={workspace.name}
+          planName={plan?.name ?? planUsage?.plan ?? null}
+          status={status}
+        />
+
         <UpdateEmailForm currentEmail={user.email ?? ""} />
         <UpdatePasswordForm />
 

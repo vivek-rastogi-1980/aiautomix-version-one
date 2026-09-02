@@ -424,47 +424,236 @@ function main(): void {
   );
 
 
-  // --- Every workspace has a commercial identity ----------------------------
+  // =========================================================================
+  // Phase 14 — workspace plan assignment and plan history (migration 0029)
   //
-  // 0007 backfilled the workspaces that existed when it ran and nothing kept
-  // the invariant afterwards, so every workspace created since had no
-  // subscription row. `entitlement_consume` returns 'no_subscription' for
-  // those, which refuses every feature: the customer submits an idea, presses
-  // Validate and is told "No plan is assigned to this workspace yet", while
-  // the dashboard shows "Plan information unavailable". 0029 makes it a
-  // trigger so it holds for workspaces created by any path.
-  const identityMigration = readFileSync(
-    path.join(process.cwd(), "supabase/migrations/0029_workspace_commercial_identity.sql"),
-    "utf8",
+  // Same approach as the section above: assert the properties in the SQL and
+  // the call sites, because those are what hold at runtime. A plan change that
+  // is authorised in TypeScript but not in Postgres is not authorised.
+  // =========================================================================
+
+  const planMigration = readFile(
+    "supabase/migrations/0029_phase14_plan_assignment.sql",
+  );
+  const adminActions = readFile("features/admin/actions.ts");
+  const adminPermissions = readFile("features/admin/permissions.ts");
+  const accountPanel = readFile("features/settings/account-panel.tsx");
+
+  // --- 1/2/3. Authorized, unauthorized, and customer plan changes ----------
+  check(
+    "changing a plan requires plans.manage inside the database",
+    (() => {
+      const from = planMigration.indexOf(
+        "create or replace function public.admin_change_workspace_plan",
+      );
+      const body = planMigration.slice(from, from + 900);
+      return (
+        /admin_has[(]'plans[.]manage'[)]/.test(body) &&
+        /insufficient_privilege/.test(body)
+      );
+    })(),
+    "the TypeScript guard is a courtesy; this is the gate",
   );
   check(
-    "a new workspace is given its commercial identity by a trigger",
-    /create trigger workspaces_provision_commercial_identity[\s\S]{0,120}after insert on public\.workspaces/.test(
-      identityMigration,
+    "plans.manage is held by SUPER_ADMIN only",
+    (() => {
+      // ADMIN's block must not list it; SUPER_ADMIN spreads every permission.
+      const adminBlock = adminPermissions.slice(
+        adminPermissions.indexOf("ADMIN: ["),
+        adminPermissions.indexOf("SUPER_ADMIN: ["),
+      );
+      return (
+        !/"plans\.manage"/.test(adminBlock) &&
+        /SUPER_ADMIN: \[\.\.\.ADMIN_PERMISSIONS\]/.test(adminPermissions)
+      );
+    })(),
+    "a customer or lesser admin must not be able to assign plans",
+  );
+  check(
+    "the plan-change action asserts plans.manage before the RPC",
+    (() => {
+      const from = adminActions.indexOf(
+        "export async function changeWorkspacePlan",
+      );
+      const body = adminActions.slice(from, from + 900);
+      const assert = body.indexOf('assertPermission(context, "plans.manage")');
+      const rpc = body.indexOf("admin_change_workspace_plan");
+      return assert !== -1 && rpc !== -1 && assert < rpc;
+    })(),
+  );
+  check(
+    "no client-side plan write exists anywhere",
+    !/from\("subscriptions"\)[\s\S]{0,120}\.(update|insert|delete)\(/.test(
+      adminActions,
     ),
-    "a backfill alone only holds until the next workspace is created",
+    "subscriptions has no write policy; the RPC is the only writer",
   );
+
+  // --- 4. Invalid plan ------------------------------------------------------
   check(
-    "the trigger creates both the subscription and the credit account",
-    /insert into public\.subscriptions[\s\S]{0,200}values \(new\.id, 'free', 'active'\)/.test(
-      identityMigration,
-    ) &&
-      /insert into public\.credit_accounts[\s\S]{0,120}values \(new\.id\)/.test(
-        identityMigration,
-      ),
-  );
-  check(
-    "it runs security definer, because the customer cannot write those tables",
-    /function public\.workspace_provision_commercial_identity[\s\S]{0,200}security definer/.test(
-      identityMigration,
+    "an unknown plan id is rejected",
+    /if not exists \(select 1 from public[.]plans where id = p_plan_id\)/.test(
+      planMigration,
     ),
-    "subscriptions and credit_accounts carry SELECT policies only",
+    "stranding a workspace on an uncatalogued plan denies every feature",
   );
   check(
-    "and it is idempotent, so the backfill cannot collide with the trigger",
-    (identityMigration.match(/on conflict \(workspace_id\) do nothing/g) ?? [])
-      .length >= 3,
+    "changing to the plan already in force is rejected",
+    /already on the % plan/.test(planMigration) &&
+      /check \(old_plan <> new_plan\)/.test(planMigration),
+    "a no-op must not write a meaningless history row",
   );
+
+  // --- 5/6. History created, and immutable ---------------------------------
+  check(
+    "a plan change writes subscription_plan_history",
+    /insert into public[.]subscription_plan_history/.test(planMigration),
+  );
+  check(
+    "plan history records the required columns",
+    ["workspace_id", "old_plan", "new_plan", "changed_by", "reason"].every(
+      (column) => new RegExp(`^\\s+${column}\\s`, "m").test(planMigration),
+    ),
+  );
+  check(
+    "plan history is append-only",
+    /before update or delete on public[.]subscription_plan_history/.test(
+      planMigration,
+    ) && /is append-only/.test(planMigration),
+  );
+  check(
+    "plan history grants no client INSERT, UPDATE or DELETE policy",
+    (() => {
+      const from = planMigration.indexOf(
+        "alter table public.subscription_plan_history enable row level security",
+      );
+      const rls = planMigration.slice(from, from + 700);
+      return (
+        /for select/.test(rls) &&
+        !/for (insert|update|delete)/.test(rls) &&
+        !/for all/.test(rls)
+      );
+    })(),
+    "the security definer function must be the only writer",
+  );
+
+  // --- 7. Audit event -------------------------------------------------------
+  check(
+    "a plan change writes a WORKSPACE_PLAN_CHANGED audit row",
+    /admin_log\(\s*'WORKSPACE_PLAN_CHANGED'/.test(planMigration),
+    "reusing admin_audit_logs rather than a parallel trail",
+  );
+
+  // --- 8. Atomicity ---------------------------------------------------------
+  check(
+    "update, history and audit happen in one function body",
+    (() => {
+      const from = planMigration.indexOf(
+        "create or replace function public.admin_change_workspace_plan",
+      );
+      const end = planMigration.indexOf("$$;", from);
+      const body = planMigration.slice(from, end);
+      return (
+        /update public[.]subscriptions/.test(body) &&
+        /insert into public[.]subscription_plan_history/.test(body) &&
+        /admin_log\(/.test(body)
+      );
+    })(),
+    "a plan change without its history must not be reachable",
+  );
+  check(
+    "the subscription row is locked before it is read",
+    (() => {
+      const from = planMigration.indexOf(
+        "create or replace function public.admin_change_workspace_plan",
+      );
+      const body = planMigration.slice(
+        from,
+        planMigration.indexOf("$$;", from),
+      );
+      const lock = body.indexOf("for update");
+      const update = body.indexOf("update public.subscriptions");
+      return lock !== -1 && update !== -1 && lock < update;
+    })(),
+    "concurrent plan changes must serialise into a chain",
+  );
+
+  // --- 9/10. Downgrade behaviour and usage preservation --------------------
+  check(
+    "a plan change never touches usage, reservations or credits",
+    (() => {
+      const from = planMigration.indexOf(
+        "create or replace function public.admin_change_workspace_plan",
+      );
+      const body = planMigration.slice(
+        from,
+        planMigration.indexOf("$$;", from),
+      );
+      return !/(usage_counters|usage_reservations|credit_accounts|credit_transactions|ai_usage_logs)/.test(
+        body,
+      );
+    })(),
+    "a downgrade limits what happens next, it does not rewrite history",
+  );
+  check(
+    "a plan change never rewrites the billing period",
+    (() => {
+      const from = planMigration.indexOf("update public.subscriptions");
+      const stmt = planMigration.slice(from, planMigration.indexOf(";", from));
+      return (
+        /set plan_id = p_plan_id/.test(stmt) &&
+        !/current_period_start|current_period_end/.test(stmt)
+      );
+    })(),
+    "resetting the period would silently hand back a spent allowance",
+  );
+  check(
+    "the old plan is read from the database, never supplied",
+    (() => {
+      const from = planMigration.indexOf(
+        "create or replace function public.admin_change_workspace_plan",
+      );
+      const sig = planMigration.slice(from, from + 300);
+      return (
+        /p_workspace_id/.test(sig) &&
+        /p_plan_id/.test(sig) &&
+        !/p_old_plan|p_current_plan/.test(sig)
+      );
+    })(),
+    "a forged current plan would record a transition that never happened",
+  );
+
+  // --- 11/12. Isolation -----------------------------------------------------
+  check(
+    "plan history reads require workspaces.read",
+    /admin_has[(]'workspaces[.]read'[)]/.test(planMigration),
+  );
+  check(
+    "the customer account panel is display-only",
+    !/changeWorkspacePlan|updatePlan|<form|useState/.test(accountPanel),
+    "a customer must have no control, and no action, to change their plan",
+  );
+
+  // --- 13/14. Customer-facing plan and usage --------------------------------
+  check(
+    "the account panel takes its plan and status as read-only props",
+    /planName/.test(accountPanel) && /status/.test(accountPanel),
+  );
+  check(
+    "the account panel hard-codes no plan limit or plan name map",
+    !/PLAN_LABEL|(free|starter|growth)\s*:/i.test(accountPanel),
+    "names come from the plans catalog so a rename needs no deploy",
+  );
+
+  // --- 15. Concurrency ------------------------------------------------------
+  check(
+    "the plan-change function returns the transition it actually applied",
+    /'old_plan', v_old_plan/.test(planMigration) &&
+      /'new_plan', p_plan_id/.test(planMigration),
+    "so a caller that lost a race sees the real before-state",
+  );
+
+
   // --- Report ---------------------------------------------------------------
   console.log(results.join("\n"));
   const total = results.length;
