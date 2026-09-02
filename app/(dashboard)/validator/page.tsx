@@ -5,6 +5,7 @@ import { History } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getProjects } from "@/features/projects/data";
 import { IdeaForm } from "@/features/business-ideas/idea-form";
+import { getIdeaDraft } from "@/features/business-ideas/draft";
 import { isPlatformConfigured } from "@/features/ai";
 import { FormAlert } from "@/components/ui/form-message";
 
@@ -16,7 +17,11 @@ export const metadata: Metadata = {
 
 export default async function ValidatorPage() {
   const user = await requireUser();
-  const projects = await getProjects(user.id);
+  // Two independent reads; no reason to await them in series.
+  const [projects, draft] = await Promise.all([
+    getProjects(user.id),
+    getIdeaDraft(user.id),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -44,7 +49,7 @@ export default async function ValidatorPage() {
         </FormAlert>
       ) : null}
 
-      <IdeaForm projects={projects} />
+      <IdeaForm projects={projects} draft={draft} />
     </div>
   );
 }

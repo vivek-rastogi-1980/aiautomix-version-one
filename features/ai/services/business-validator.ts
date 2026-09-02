@@ -60,6 +60,16 @@ export async function validateBusinessIdea(
   userId: string,
   workspaceId: string,
   input: BusinessIdeaInput,
+  /**
+   * An existing `draft` idea to validate in place, rather than inserting a
+   * new one. Supplied when the customer opened the form from the draft the
+   * onboarding funnel saved for them.
+   *
+   * Treated as a hint, never as authorisation: the update below is scoped to
+   * this user and to `status = 'draft'`, and runs under the caller's own RLS,
+   * so a forged id updates nothing and falls back to the insert.
+   */
+  draftIdeaId: string | null = null,
 ): Promise<ValidationOutcome> {
   const supabase = await createClient();
   const projectId = input.projectId ? input.projectId : null;
@@ -96,18 +106,56 @@ export async function validateBusinessIdea(
   }
 
   // 1. Persist the submission first so a failed run is still auditable.
-  const { data: idea, error: ideaError } = await supabase
-    .from("business_ideas")
-    .insert({
-      user_id: userId,
-      workspace_id: workspaceId,
-      project_id: projectId,
-      title: input.businessName,
-      payload_json: input as unknown as Record<string, unknown>,
-      status: "processing",
-    })
-    .select()
-    .single();
+  //
+  // Reusing the funnel's draft where there is one keeps a customer to a single
+  // idea row. Inserting unconditionally forked every funnel submission in two:
+  // the draft `leads.business_idea_id` points at, which stayed a draft
+  // forever, and a second row that got the report — so the lead's own link led
+  // to the unvalidated copy.
+  //
+  // Scoped by user_id AND status so it can only ever claim this caller's own
+  // unvalidated draft; a row already validated is never overwritten. `select`
+  // returns no row if nothing matched, which falls through to the insert.
+  let idea: BusinessIdea | null = null;
+  let ideaError: { message: string } | null = null;
+
+  if (draftIdeaId) {
+    const { data, error } = await supabase
+      .from("business_ideas")
+      .update({
+        workspace_id: workspaceId,
+        project_id: projectId,
+        title: input.businessName,
+        payload_json: input as unknown as Record<string, unknown>,
+        status: "processing",
+      })
+      .eq("id", draftIdeaId)
+      .eq("user_id", userId)
+      .eq("status", "draft")
+      .select()
+      .maybeSingle();
+
+    if (error) ideaError = error;
+    idea = data ?? null;
+  }
+
+  if (!idea) {
+    const { data, error } = await supabase
+      .from("business_ideas")
+      .insert({
+        user_id: userId,
+        workspace_id: workspaceId,
+        project_id: projectId,
+        title: input.businessName,
+        payload_json: input as unknown as Record<string, unknown>,
+        status: "processing",
+      })
+      .select()
+      .single();
+
+    idea = data ?? null;
+    ideaError = error ?? null;
+  }
 
   if (ideaError || !idea) {
     // The allowance was reserved a moment ago and the run is not going to

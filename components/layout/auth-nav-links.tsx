@@ -80,6 +80,7 @@ export function AuthNavLinks() {
     return (
       <span
         aria-hidden="true"
+        className="site-nav-auth-placeholder"
         style={{ display: "inline-block", width: "72px" }}
       />
     );
@@ -87,7 +88,7 @@ export function AuthNavLinks() {
 
   if (!signedIn) {
     return (
-      <Link href="/login" style={linkStyle}>
+      <Link href="/login" className="site-nav-pill" style={linkStyle}>
         Log in
       </Link>
     );
@@ -95,7 +96,7 @@ export function AuthNavLinks() {
 
   return (
     <>
-      <Link href="/dashboard" style={linkStyle}>
+      <Link href="/dashboard" className="site-nav-pill" style={linkStyle}>
         Dashboard
       </Link>
       {/*
@@ -104,7 +105,7 @@ export function AuthNavLinks() {
         and the links this header shows cannot disagree afterwards.
       */}
       <form action={signOutAction} style={{ display: "contents" }}>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="site-nav-pill" style={buttonStyle}>
           Log out
         </button>
       </form>

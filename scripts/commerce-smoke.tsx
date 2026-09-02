@@ -423,6 +423,7 @@ function main(): void {
     "failing open is worst exactly when load is highest",
   );
 
+
   // =========================================================================
   // Phase 14 — workspace plan assignment and plan history (migration 0029)
   //
@@ -651,6 +652,7 @@ function main(): void {
       /'new_plan', p_plan_id/.test(planMigration),
     "so a caller that lost a race sees the real before-state",
   );
+
 
   // --- Report ---------------------------------------------------------------
   console.log(results.join("\n"));
