@@ -49,6 +49,14 @@ export const businessPlanInputSchema = z.object({
   /** Optional links up the workspace hierarchy. */
   projectId: optionalUuid("Choose a valid project"),
   businessIdeaId: optionalUuid("Choose a valid business idea"),
+  /**
+   * Set when the brief was prefilled from a validation report. Accepted here so
+   * the plan can link back to its source, but never trusted: the Server Action
+   * re-reads the report under the caller's own session before it is persisted,
+   * so a forged id resolves to nothing rather than to another workspace's
+   * report.
+   */
+  validationReportId: optionalUuid("Choose a valid validation report"),
 });
 
 export type BusinessPlanInput = z.infer<typeof businessPlanInputSchema>;

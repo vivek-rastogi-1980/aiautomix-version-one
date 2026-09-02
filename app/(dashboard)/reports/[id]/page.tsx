@@ -10,6 +10,9 @@ import { ReportRenderer } from "@/features/ai/renderer/report-renderer";
 import { DownloadPdfButton } from "@/features/ai/pdf/download-pdf-button";
 import { StartResearchLink } from "@/features/research/start-research-link";
 import { StartCompetitorsLink } from "@/features/competitors/start-competitors-link";
+import { CreatePlanFromValidationLink } from "@/features/business-plans/create-plan-from-validation-link";
+import { getPlansForValidationReport } from "@/features/business-plans/data";
+import { getWorkspaceContext } from "@/features/workspaces/data";
 import { FormAlert } from "@/components/ui/form-message";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
 import { recordFunnelEvent } from "@/features/onboarding/funnel-events";
@@ -39,6 +42,15 @@ export default async function ReportPage({ params }: PageProps) {
   const { report: record, idea } = result;
   const title = idea?.title ?? "Business idea";
 
+  // Does this validated idea already have a plan? Decides whether the next-step
+  // CTA reads "Create business plan" or "View business plan". Scoped to the
+  // caller's own workspace, so it can never surface another workspace's plan.
+  const { workspace } = await getWorkspaceContext(user.id);
+  const existingPlans = await getPlansForValidationReport(
+    workspace.id,
+    record.id,
+  );
+
   // Stored JSON is re-validated before rendering: a report written by an older
   // prompt version must never crash the page.
   const parsed = businessValidatorReportSchema.safeParse(record.report_json);
@@ -67,6 +79,13 @@ export default async function ReportPage({ params }: PageProps) {
             <>
               {/* The validated idea is the natural starting point for market
                   research, so the handoff lives where the verdict is read. */}
+              {/* The plan is the natural next step from a validated idea, so
+                  it leads. Rendered inside the `parsed.success` branch only:
+                  a report that cannot be read is not one to plan from. */}
+              <CreatePlanFromValidationLink
+                validationReportId={record.id}
+                existingPlanId={existingPlans[0]?.id}
+              />
               {idea ? <StartResearchLink ideaId={idea.id} /> : null}
               {idea ? <StartCompetitorsLink ideaId={idea.id} /> : null}
               <DownloadPdfButton

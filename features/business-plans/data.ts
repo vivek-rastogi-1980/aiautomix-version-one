@@ -181,3 +181,54 @@ export async function saveSectionRevision(options: {
 
   return updated;
 }
+
+// ---------------------------------------------------------------------------
+// Validation-derived plans  (migration 0030)
+// ---------------------------------------------------------------------------
+
+/**
+ * Plans generated from a given validation report, newest first.
+ *
+ * Scoped to the workspace as well as the report id. The report id alone would
+ * be enough under RLS, but naming the workspace makes the isolation explicit at
+ * the call site rather than implicit in a policy somebody has to go and read.
+ */
+export async function getPlansForValidationReport(
+  workspaceId: string,
+  validationReportId: string,
+): Promise<BusinessPlan[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("business_plans")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("validation_report_id", validationReportId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+/**
+ * The set of validation report ids in this workspace that already have a plan.
+ *
+ * One query for the whole list rather than one per report — the plans page
+ * renders every validated idea, and a per-row lookup would be N round trips for
+ * a badge.
+ */
+export async function getPlannedValidationReportIds(
+  workspaceId: string,
+): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("business_plans")
+    .select("validation_report_id")
+    .eq("workspace_id", workspaceId)
+    .not("validation_report_id", "is", null)
+    .is("deleted_at", null);
+
+  return new Set(
+    (data ?? [])
+      .map((row) => row.validation_report_id)
+      .filter((id): id is string => typeof id === "string"),
+  );
+}

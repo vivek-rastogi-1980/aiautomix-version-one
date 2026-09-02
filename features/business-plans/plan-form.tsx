@@ -19,11 +19,26 @@ import {
   MODEL_LABELS,
   STAGE_LABELS,
 } from "@/lib/validations/business-idea";
+import type { BusinessPlanInput } from "@/lib/validations/business-plan";
 import type { BusinessIdea, Project } from "@/types/database";
 
 interface PlanFormProps {
   projects: Project[];
   ideas: BusinessIdea[];
+  /**
+   * Starting values, when the brief was prefilled from a validation report.
+   *
+   * The form stays UNCONTROLLED — these become `defaultValue`, not `value`.
+   * That is what keeps the prefill a starting point rather than a cage: the
+   * customer can edit every field, and React never reasserts the original.
+   */
+  initial?: Partial<BusinessPlanInput>;
+  /**
+   * The report the prefill came from, posted back as a hidden field so the
+   * generated plan can link to its source. Re-verified server-side before it is
+   * persisted — see `generateBusinessPlanAction`.
+   */
+  validationReportId?: string;
 }
 
 function FormSection({
@@ -49,7 +64,12 @@ function FormSection({
 }
 
 /** The brief that drives the Business Plan Generator. */
-export function PlanForm({ projects, ideas }: PlanFormProps) {
+export function PlanForm({
+  projects,
+  ideas,
+  initial,
+  validationReportId,
+}: PlanFormProps) {
   const [state, formAction] = useActionState(
     generateBusinessPlanAction,
     idleState,
@@ -58,6 +78,16 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
+      {/* Carried through the post so the plan can record where it came from.
+          Hidden because it is not the customer's to choose — and harmless if
+          tampered with, since the action re-reads it under their own session. */}
+      {validationReportId ? (
+        <input
+          type="hidden"
+          name="validationReportId"
+          value={validationReportId}
+        />
+      ) : null}
       {state.status === "error" && !errors ? (
         <FormAlert variant="error">{state.message}</FormAlert>
       ) : null}
@@ -71,6 +101,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="businessName"
             name="businessName"
+            defaultValue={initial?.businessName ?? ""}
             placeholder="Acme Invoicing"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.businessName)}
@@ -83,6 +114,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Textarea
             id="ideaDescription"
             name="ideaDescription"
+            defaultValue={initial?.ideaDescription ?? ""}
             rows={5}
             placeholder="Describe what the business does, the problem it solves and how it works."
             className="mt-1.5"
@@ -112,6 +144,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="industry"
             name="industry"
+            defaultValue={initial?.industry ?? ""}
             placeholder="Fintech"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.industry)}
@@ -124,6 +157,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="country"
             name="country"
+            defaultValue={initial?.country ?? ""}
             placeholder="India"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.country)}
@@ -136,6 +170,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Textarea
             id="targetAudience"
             name="targetAudience"
+            defaultValue={initial?.targetAudience ?? ""}
             rows={2}
             placeholder="Owners of service businesses with 5-50 staff who invoice manually."
             className="mt-1.5"
@@ -155,7 +190,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
             id="businessModel"
             name="businessModel"
             className="mt-1.5"
-            defaultValue="saas"
+            defaultValue={initial?.businessModel ?? "saas"}
           >
             {BUSINESS_MODELS.map((model) => (
               <option key={model} value={model}>
@@ -172,7 +207,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
             id="currentStage"
             name="currentStage"
             className="mt-1.5"
-            defaultValue="idea"
+            defaultValue={initial?.currentStage ?? "idea"}
           >
             {BUSINESS_STAGES.map((stage) => (
               <option key={stage} value={stage}>
@@ -188,6 +223,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="estimatedBudget"
             name="estimatedBudget"
+            defaultValue={initial?.estimatedBudget ?? ""}
             type="number"
             min={0}
             step={1000}
@@ -203,6 +239,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="fundingGoal"
             name="fundingGoal"
+            defaultValue={initial?.fundingGoal ?? ""}
             placeholder="250,000 USD pre-seed"
             className="mt-1.5"
             aria-invalid={Boolean(errors?.fundingGoal)}
@@ -220,6 +257,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="timeline"
             name="timeline"
+            defaultValue={initial?.timeline ?? ""}
             placeholder="Launch in 6 months"
             className="mt-1.5"
           />
@@ -231,6 +269,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Input
             id="teamSummary"
             name="teamSummary"
+            defaultValue={initial?.teamSummary ?? ""}
             placeholder="Two founders — engineering and sales"
             className="mt-1.5"
           />
@@ -242,6 +281,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Textarea
             id="competitors"
             name="competitors"
+            defaultValue={initial?.competitors ?? ""}
             rows={2}
             placeholder="Zoho Invoice, FreshBooks"
             className="mt-1.5"
@@ -254,6 +294,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
           <Textarea
             id="additionalNotes"
             name="additionalNotes"
+            defaultValue={initial?.additionalNotes ?? ""}
             rows={3}
             placeholder="Constraints, traction so far, regulatory context…"
             className="mt-1.5"
@@ -264,7 +305,12 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
         {projects.length > 0 ? (
           <div>
             <Label htmlFor="projectId">Link to a project</Label>
-            <Select id="projectId" name="projectId" className="mt-1.5">
+            <Select
+              id="projectId"
+              name="projectId"
+              className="mt-1.5"
+              defaultValue={initial?.projectId ?? ""}
+            >
               <option value="">None</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
@@ -283,6 +329,7 @@ export function PlanForm({ projects, ideas }: PlanFormProps) {
               id="businessIdeaId"
               name="businessIdeaId"
               className="mt-1.5"
+              defaultValue={initial?.businessIdeaId ?? ""}
             >
               <option value="">None</option>
               {ideas.map((idea) => (

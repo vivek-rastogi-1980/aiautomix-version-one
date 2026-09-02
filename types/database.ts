@@ -215,6 +215,12 @@ export type BusinessPlan = {
   user_id: string;
   project_id: string | null;
   business_idea_id: string | null;
+  /**
+   * Migration 0030. The validation report this plan was generated from, or null
+   * for a plan created directly. Non-null IS the "created from a validated
+   * idea" flag — there is no separate source column to disagree with it.
+   */
+  validation_report_id: string | null;
   title: string;
   summary: string | null;
   status: BusinessPlanStatus;
@@ -428,6 +434,7 @@ type BusinessPlanInsert = {
   model: string;
   project_id?: string | null;
   business_idea_id?: string | null;
+  validation_report_id?: string | null;
   summary?: string | null;
   status?: BusinessPlanStatus;
   workflow?: string;

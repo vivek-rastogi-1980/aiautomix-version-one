@@ -107,6 +107,21 @@ export async function generateBusinessPlan({
       user_id: userId,
       project_id: projectId,
       business_idea_id: businessIdeaId,
+      // Migration 0030. Non-null exactly when this plan began as a validated
+      // idea — there is no separate `source` column, because this IS the flag.
+      // The caller has already re-read the report under the user's own session,
+      // so by this point it is a verified id rather than a submitted one.
+      //
+      // Spread rather than always sending `null`, so that this code is safe to
+      // deploy BEFORE 0030 is applied: PostgREST rejects an insert naming a
+      // column that does not exist yet, and always sending the key would break
+      // every plan — including the ordinary ones that have nothing to do with
+      // this feature. Omitting it leaves the existing path byte-identical to
+      // what it was, and only the validation-derived path depends on the new
+      // column.
+      ...(input.validationReportId
+        ? { validation_report_id: input.validationReportId }
+        : {}),
       title: input.businessName,
       status: "generating",
       input_json: input as unknown as Record<string, unknown>,
