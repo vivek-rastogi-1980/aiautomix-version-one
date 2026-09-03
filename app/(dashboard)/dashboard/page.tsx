@@ -10,6 +10,9 @@ import { IdeaPanel } from "@/features/dashboard/idea-panel";
 import { PlanPanel } from "@/features/dashboard/plan-panel";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { getEntitlementUsage } from "@/features/commerce/enforcement";
+import { getBusinessPlans } from "@/features/business-plans/data";
+import { getLatestRoadmapSummary } from "@/features/roadmaps/data";
+import { ExecutionStatusPanel } from "@/features/roadmaps/execution-status-panel";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -21,14 +24,26 @@ export default async function DashboardPage() {
   // come into existence.
   const { workspace } = await getWorkspaceContext(user.id);
 
-  const [profile, projects, reports, funnel, planUsage] = await Promise.all([
-    getProfile(user.id),
-    getProjects(user.id),
-    getReports(user.id),
-    // The customer's own funnel state: idea, validation status, score, booking.
-    getDashboardFunnel(user.id),
-    getEntitlementUsage(workspace.id),
-  ]);
+  const [profile, projects, reports, funnel, planUsage, plans, roadmap] =
+    await Promise.all([
+      getProfile(user.id),
+      getProjects(user.id),
+      getReports(user.id),
+      // The customer's own funnel state: idea, validation status, score, booking.
+      getDashboardFunnel(user.id),
+      getEntitlementUsage(workspace.id),
+      getBusinessPlans(workspace.id),
+      getLatestRoadmapSummary(workspace.id),
+    ]);
+
+  // Phase 15: the next step after planning. The roadmap the panel links to is
+  // the one belonging to the newest plan when both exist; when a plan exists
+  // with no roadmap the panel prompts for one, and with no plan at all it
+  // renders nothing rather than showing an execution status for work that has
+  // not been planned.
+  const latestPlan = plans[0] ?? null;
+  const roadmapMatchesLatestPlan =
+    roadmap?.roadmap.business_plan_id === latestPlan?.id;
 
   const name =
     profile?.full_name?.trim() || user.email?.split("@")[0] || "there";
@@ -42,6 +57,16 @@ export default async function DashboardPage() {
         <IdeaPanel funnel={funnel} />
         <PlanPanel usage={planUsage} />
       </div>
+      <div className="mb-6">
+        <ExecutionStatusPanel
+          businessPlanId={latestPlan?.id ?? null}
+          planTitle={latestPlan?.title ?? null}
+          progress={
+            roadmap && roadmapMatchesLatestPlan ? roadmap.progress : null
+          }
+        />
+      </div>
+
       <Overview
         name={name}
         profile={profile}

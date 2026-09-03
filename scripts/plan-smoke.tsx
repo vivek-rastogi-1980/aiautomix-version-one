@@ -27,6 +27,13 @@ import path from "node:path";
 
 import type { BusinessValidatorReport } from "@/features/ai/schemas/business-validator";
 import { validationReportToBusinessPlanInput } from "@/features/business-plans/from-validation";
+import {
+  executionRoadmapSchema,
+  roadmapPeriodBlocks,
+  ROADMAP_PERIODS,
+  TASK_CATEGORIES,
+  TASK_STATUSES,
+} from "@/features/ai/schemas/execution-roadmap";
 import { VALID_PLAN_DOCUMENT } from "@/scripts/fixtures";
 import type { BusinessPlan, BusinessPlanSection } from "@/types/database";
 
@@ -437,6 +444,304 @@ async function main(): Promise<void> {
   check(
     "no separate source column duplicates the link",
     !/add column if not exists source/.test(linkMigration),
+  );
+
+  // =========================================================================
+  // Phase 15 — business plan -> execution roadmap (migration 0031)
+  //
+  // The output schema is a pure contract, so those are real unit tests. The
+  // security, entitlement and progress properties live in SQL and server files
+  // and are asserted by parsing them, matching the commerce suite's approach.
+  // =========================================================================
+
+  const period = (n: number) => ({
+    priorities: ["Prove clinics will pay"],
+    milestones: [
+      { title: `Milestone ${n}`, description: "What is true when reached" },
+    ],
+    tasks: Array.from({ length: n }, (_, i) => ({
+      title: `Interview ${i + 1} practice managers`,
+      description: "Book, run and write up the conversation.",
+      category: "CUSTOMER_DEVELOPMENT" as const,
+      priority: "HIGH" as const,
+    })),
+  });
+
+  const ROADMAP = {
+    summary: "Ninety days from idea to first paying dental clinic.",
+    days_30: period(3),
+    days_60: period(2),
+    days_90: period(2),
+  };
+
+  const roadmapParsed = executionRoadmapSchema.safeParse(ROADMAP);
+  check("a well-formed roadmap validates", roadmapParsed.success);
+
+  check(
+    "the three periods are exposed in reading order",
+    roadmapPeriodBlocks(ROADMAP)
+      .map((b) => b.period)
+      .join(",") === "30,60,90",
+  );
+  check("three roadmap periods defined", ROADMAP_PERIODS.length === 3);
+
+  // --- The schema is what stops fabrication reaching the database ----------
+  check(
+    "no schema field can carry a revenue, funding or headcount claim",
+    (() => {
+      const keys = JSON.stringify(
+        executionRoadmapSchema.shape.days_30.shape.tasks.element.shape,
+      );
+      return !/revenue|funding|customers|headcount|employees|partner/i.test(
+        keys,
+      );
+    })(),
+    "a model has nowhere to assert facts it cannot know",
+  );
+  check(
+    "tasks carry no model-authored due date",
+    !(
+      "dueDate" in
+      executionRoadmapSchema.shape.days_30.shape.tasks.element.shape
+    ),
+    "an invented deadline is indistinguishable from a real one",
+  );
+
+  // --- Vocabularies ---------------------------------------------------------
+  check(
+    "task status is a person's vocabulary, not the dispatcher's",
+    TASK_STATUSES.includes("NOT_STARTED") &&
+      TASK_STATUSES.includes("BLOCKED") &&
+      !TASK_STATUSES.some((v) =>
+        ["AWAITING_APPROVAL", "APPROVED", "EXECUTING"].includes(v),
+      ),
+    "roadmap tasks are done by people, never dispatched to a provider",
+  );
+  check(
+    "GENERAL exists so a category is never forced",
+    TASK_CATEGORIES.includes("GENERAL"),
+  );
+
+  // --- Malformed model output is rejected before persistence ---------------
+  for (const [name, bad] of [
+    ["an empty period", { ...ROADMAP, days_60: period(0) }],
+    [
+      "an unknown category",
+      {
+        ...ROADMAP,
+        days_30: {
+          ...period(2),
+          tasks: [
+            {
+              title: "T",
+              description: "D",
+              category: "MADE_UP",
+              priority: "HIGH",
+            },
+          ],
+        },
+      },
+    ],
+    ["a missing period", { summary: "x", days_30: period(2) }],
+  ] as const) {
+    check(
+      `${name} is rejected before it can be persisted`,
+      !executionRoadmapSchema.safeParse(bad).success,
+    );
+  }
+
+  // --- Server-side properties ----------------------------------------------
+  const roadmapMigration = read(
+    "supabase/migrations/0031_phase15_execution_roadmap.sql",
+  );
+  const roadmapService = read("features/ai/services/execution-roadmap.ts");
+  const roadmapActions = read("features/roadmaps/actions.ts");
+  const roadmapData = read("features/roadmaps/data.ts");
+  const roadmapPage = read("app/(dashboard)/plans/[id]/execution/page.tsx");
+
+  check(
+    "roadmap generation consumes the existing atomic entitlement",
+    roadmapService.includes("consumeEntitlement(") &&
+      roadmapService.includes('"execution_roadmap"'),
+  );
+  check(
+    "entitlement is reserved BEFORE the model call",
+    (() => {
+      const consume = roadmapService.indexOf("consumeEntitlement(");
+      const run = roadmapService.indexOf("await runWorkflow");
+      return consume !== -1 && run !== -1 && consume < run;
+    })(),
+    "a denial must cost zero AI spend",
+  );
+  check(
+    "a failed generation releases the reservation",
+    roadmapService.includes("releaseEntitlement(") &&
+      (roadmapService.match(/releaseEntitlement\(/g) ?? []).length >= 2,
+    "including the path that throws before the try/catch",
+  );
+  check(
+    "no second usage counter is introduced",
+    // Matches WRITES, not mentions: both files legitimately explain in prose
+    // why they rely on the existing counter, and an assertion that forbade the
+    // words would punish the comment rather than the behaviour.
+    (() => {
+      const writes =
+        /\.from\(\s*["'](usage_counters|usage_reservations)["']\s*\)|insert into\s+public\.(usage_counters|usage_reservations)|update\s+public\.(usage_counters|usage_reservations)/;
+      return !writes.test(roadmapService) && !writes.test(roadmapActions);
+    })(),
+    "the roadmap must spend allowance only through entitlement_consume",
+  );
+  check(
+    "the idempotency key is derived from the workspace and plan, not the client",
+    /execution_roadmap:\$\{workspaceId\}:\$\{businessPlanId\}/.test(
+      roadmapService,
+    ),
+    "a retry must collide rather than spend a second roadmap",
+  );
+
+  check(
+    "the plan is resolved under the caller's workspace before generating",
+    /getBusinessPlan\(workspace\.id, planId\)/.test(roadmapActions),
+    "a posted plan id is a claim, not a fact",
+  );
+  check(
+    "an existing roadmap short-circuits instead of generating again",
+    /getRoadmapForPlan\(workspace\.id, planId\)/.test(roadmapActions) &&
+      /if \(existing\) redirect/.test(roadmapActions),
+  );
+  check(
+    "the task update is filtered on the session's workspace",
+    /\.eq\("workspace_id", workspace\.id\)/.test(roadmapActions),
+    "a task id from another workspace must match zero rows",
+  );
+  check(
+    "not-found and not-yours give the same answer",
+    (roadmapActions.match(/We couldn't find this business plan\./g) ?? [])
+      .length >= 2,
+    "distinguishing them confirms another workspace's ids exist",
+  );
+  check(
+    "the roadmap page 404s a plan outside the workspace",
+    /getBusinessPlan\(workspace\.id, id\)/.test(roadmapPage) &&
+      /notFound\(\)/.test(roadmapPage),
+  );
+
+  // --- Progress is server-owned --------------------------------------------
+  check(
+    "progress is computed in SQL, not derived client-side",
+    /execution_roadmap_progress/.test(roadmapMigration) &&
+      /execution_roadmap_progress/.test(roadmapData),
+  );
+  check(
+    "no percentage column exists to be written",
+    !/percent\s+(integer|numeric)/.test(roadmapMigration),
+    "a stored percentage is a number a client could try to set",
+  );
+  check(
+    "an empty roadmap is 0%, not a division by zero",
+    /case when v_total = 0 then 0/.test(roadmapMigration),
+  );
+  check(
+    "progress requires workspace membership",
+    (() => {
+      const from = roadmapMigration.indexOf(
+        "create or replace function public.execution_roadmap_progress",
+      );
+      const body = roadmapMigration.slice(from);
+      return (
+        /is_workspace_member/.test(body) && /insufficient_privilege/.test(body)
+      );
+    })(),
+  );
+
+  // --- RLS ------------------------------------------------------------------
+  check(
+    "both roadmap tables enable row level security",
+    /alter table public\.execution_roadmaps enable row level security/.test(
+      roadmapMigration,
+    ) &&
+      /alter table public\.execution_roadmap_tasks enable row level security/.test(
+        roadmapMigration,
+      ),
+  );
+  check(
+    "every roadmap policy is scoped by workspace membership or admin read",
+    (() => {
+      const policies = roadmapMigration.match(/create policy[\s\S]*?;/g) ?? [];
+      return (
+        policies.length >= 7 &&
+        policies.every(
+          (p) =>
+            p.includes("is_workspace_member") ||
+            p.includes("admin_has('workspaces.read')"),
+        )
+      );
+    })(),
+    "a policy without a workspace predicate is a cross-workspace leak",
+  );
+  check(
+    "the generated roadmap document has no UPDATE policy",
+    !/create policy[^;]*on public\.execution_roadmaps for update/.test(
+      roadmapMigration,
+    ),
+    "the record of what was generated is not editable",
+  );
+  check(
+    "task updates are membership-checked on both sides",
+    (() => {
+      const from = roadmapMigration.indexOf(
+        '"Members update their roadmap tasks"',
+      );
+      const body = roadmapMigration.slice(from, from + 400);
+      return (
+        /using \(public\.is_workspace_member/.test(body) &&
+        /with check \(public\.is_workspace_member/.test(body)
+      );
+    })(),
+    "without WITH CHECK a row could be updated into another workspace",
+  );
+
+  // --- Indexes on every new foreign key ------------------------------------
+  for (const idx of [
+    "execution_roadmaps_workspace_idx",
+    "execution_roadmaps_plan_idx",
+    "execution_roadmap_tasks_roadmap_idx",
+    "execution_roadmap_tasks_workspace_idx",
+  ]) {
+    check(`index ${idx} exists`, roadmapMigration.includes(idx));
+  }
+
+  // --- The Phase 10 automation engine is untouched -------------------------
+  check(
+    "the roadmap does not write to the automation engine's tables",
+    !/execution_actions|execution_runs|execution_plans/.test(roadmapService) &&
+      !/execution_actions|execution_runs|execution_plans/.test(roadmapActions),
+    "roadmap tasks must never become dispatchable actions",
+  );
+  check(
+    "business_execution remains the automation engine's own flag",
+    !roadmapMigration.includes("'business_execution'") ||
+      !/update public\.plan_entitlements/.test(roadmapMigration),
+    "Phase 15 must not re-gate Phase 10",
+  );
+  check(
+    "the roadmap entitlement is seeded for all five plans",
+    ["free", "starter", "growth", "professional", "enterprise"].every((plan) =>
+      new RegExp(`\\('${plan}','execution_roadmap'`).test(roadmapMigration),
+    ),
+    "a missing pair fails closed and hides the feature",
+  );
+
+  // --- Reuse, not reinvention ----------------------------------------------
+  check(
+    "the roadmap page reuses the existing booking flow",
+    roadmapPage.includes("/strategy-session"),
+    "no second booking system",
+  );
+  check(
+    "generation goes through the Workflow Manager, never a provider directly",
+    roadmapService.includes("runWorkflow") &&
+      !/from "openai"|new OpenAI/.test(roadmapService),
   );
 
   console.log("\n" + results.join("\n"));

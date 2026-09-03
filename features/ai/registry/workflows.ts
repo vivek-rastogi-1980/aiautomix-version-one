@@ -5,6 +5,7 @@ import type {
 } from "@/features/ai/engine/types";
 import { businessPlanSchema } from "@/features/ai/schemas/business-plan";
 import { businessValidatorReportSchema } from "@/features/ai/schemas/business-validator";
+import { executionRoadmapSchema } from "@/features/ai/schemas/execution-roadmap";
 import {
   businessIdeaSchema,
   toPromptVariables,
@@ -13,6 +14,10 @@ import {
   businessPlanInputSchema,
   toPlanPromptVariables,
 } from "@/lib/validations/business-plan";
+import {
+  executionRoadmapInputSchema,
+  toRoadmapPromptVariables,
+} from "@/lib/validations/execution-roadmap";
 import { RESEARCH_WORKFLOWS } from "@/features/research/stages/workflows";
 import { COMPETITOR_WORKFLOWS } from "@/features/competitors/stages/workflows";
 import { FINANCIAL_WORKFLOWS } from "@/features/financials/stages/workflows";
@@ -30,6 +35,7 @@ import { GTM_WORKFLOWS } from "@/features/marketing/stages/workflows";
 
 export const BUSINESS_VALIDATOR_WORKFLOW = "business-validator";
 export const BUSINESS_PLAN_WORKFLOW = "business-plan";
+export const EXECUTION_ROADMAP_WORKFLOW = "execution-roadmap";
 
 const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
   [BUSINESS_VALIDATOR_WORKFLOW]: {
@@ -55,6 +61,25 @@ const WORKFLOWS: Record<string, AnyWorkflowDefinition> = {
     provider: "openai",
     // Eleven prose sections do not fit in the platform default of 4000.
     maxOutputTokens: 9000,
+  },
+
+  // Phase 15: turns a written plan into 30/60/90-day work. Registered like any
+  // other product, so schema validation, retries, usage logging and cost
+  // estimation come from the platform rather than being reimplemented.
+  [EXECUTION_ROADMAP_WORKFLOW]: {
+    id: EXECUTION_ROADMAP_WORKFLOW,
+    label: "Execution Roadmap",
+    description:
+      "Turns a generated business plan into 30, 60 and 90-day priorities, milestones and tasks.",
+    promptVersion: "v1",
+    inputSchema: executionRoadmapInputSchema,
+    outputSchema: executionRoadmapSchema,
+    toVariables: toRoadmapPromptVariables,
+    provider: "openai",
+    // Three periods of priorities, milestones and up to ten tasks each. The
+    // 4000 default truncates it mid-array, which fails validation and burns a
+    // retry rather than returning a short roadmap.
+    maxOutputTokens: 8000,
   },
 
   // Sprint 8: the seven Market Research stages. Registered here like any other

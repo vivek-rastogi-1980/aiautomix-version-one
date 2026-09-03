@@ -207,6 +207,62 @@ export type WorkspaceMember = {
   updated_at: string;
 };
 
+/** Phase 15 — execution roadmap vocabularies (migration 0031). */
+export type RoadmapPeriod = "30" | "60" | "90";
+
+export type RoadmapTaskCategory =
+  | "MARKETING"
+  | "SALES"
+  | "OPERATIONS"
+  | "PRODUCT"
+  | "TECHNOLOGY"
+  | "FINANCE"
+  | "LEGAL"
+  | "CUSTOMER_DEVELOPMENT"
+  | "GENERAL";
+
+export type RoadmapTaskPriority = "HIGH" | "MEDIUM" | "LOW";
+
+/**
+ * A person's execution status. Deliberately disjoint from
+ * `ExecutionActionStatus` (the Phase 10 automation engine), which describes a
+ * machine dispatching work through a provider.
+ */
+export type RoadmapTaskStatus =
+  "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED";
+
+export type ExecutionRoadmap = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  business_plan_id: string;
+  title: string;
+  summary: string | null;
+  document: Record<string, unknown>;
+  workflow: string;
+  prompt_version: string;
+  model: string;
+  ai_request_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExecutionRoadmapTask = {
+  id: string;
+  roadmap_id: string;
+  workspace_id: string;
+  period: RoadmapPeriod;
+  title: string;
+  description: string | null;
+  category: RoadmapTaskCategory;
+  priority: RoadmapTaskPriority;
+  status: RoadmapTaskStatus;
+  due_date: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BusinessPlanStatus = "draft" | "generating" | "ready" | "failed";
 
 export type BusinessPlan = {
@@ -423,6 +479,49 @@ type WorkspaceMemberInsert = {
 };
 type WorkspaceMemberUpdate = Partial<
   Omit<WorkspaceMember, "id" | "created_at">
+>;
+
+type ExecutionRoadmapInsert = {
+  workspace_id: string;
+  user_id: string;
+  business_plan_id: string;
+  title: string;
+  prompt_version: string;
+  model: string;
+  summary?: string | null;
+  document?: Record<string, unknown>;
+  workflow?: string;
+  ai_request_id?: string | null;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type ExecutionRoadmapUpdate = Partial<
+  Omit<ExecutionRoadmap, "id" | "created_at">
+>;
+
+type ExecutionRoadmapTaskInsert = {
+  roadmap_id: string;
+  workspace_id: string;
+  period: RoadmapPeriod;
+  title: string;
+  description?: string | null;
+  category?: RoadmapTaskCategory;
+  priority?: RoadmapTaskPriority;
+  status?: RoadmapTaskStatus;
+  due_date?: string | null;
+  sort_order?: number;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type ExecutionRoadmapTaskUpdate = Partial<
+  Omit<
+    ExecutionRoadmapTask,
+    "id" | "roadmap_id" | "workspace_id" | "created_at"
+  >
 >;
 
 type BusinessPlanInsert = {
@@ -1653,6 +1752,18 @@ export interface Database {
         Update: BusinessPlanUpdate;
         Relationships: [];
       };
+      execution_roadmaps: {
+        Row: ExecutionRoadmap;
+        Insert: ExecutionRoadmapInsert;
+        Update: ExecutionRoadmapUpdate;
+        Relationships: [];
+      };
+      execution_roadmap_tasks: {
+        Row: ExecutionRoadmapTask;
+        Insert: ExecutionRoadmapTaskInsert;
+        Update: ExecutionRoadmapTaskUpdate;
+        Relationships: [];
+      };
       business_plan_sections: {
         Row: BusinessPlanSection;
         Insert: BusinessPlanSectionInsert;
@@ -2281,6 +2392,14 @@ export interface Database {
        * `subscription_plan_history` row and writes the admin audit row in one
        * transaction. Requires `plans.manage`.
        */
+      /**
+       * Migration 0031. Roadmap completion computed in SQL so the percentage is
+       * never a value the client can write.
+       */
+      execution_roadmap_progress: {
+        Args: { p_roadmap_id: string };
+        Returns: Record<string, number>;
+      };
       admin_change_workspace_plan: {
         Args: {
           p_workspace_id: string;
