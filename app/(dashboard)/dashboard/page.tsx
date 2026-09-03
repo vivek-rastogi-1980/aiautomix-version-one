@@ -13,6 +13,7 @@ import { getEntitlementUsage } from "@/features/commerce/enforcement";
 import { getBusinessPlans } from "@/features/business-plans/data";
 import { getLatestRoadmapSummary } from "@/features/roadmaps/data";
 import { ExecutionStatusPanel } from "@/features/roadmaps/execution-status-panel";
+import { AdvisorEntryPanel } from "@/features/advisor/advisor-entry-panel";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -65,6 +66,10 @@ export default async function DashboardPage() {
             roadmap && roadmapMatchesLatestPlan ? roadmap.progress : null
           }
         />
+      </div>
+
+      <div className="mb-6">
+        <AdvisorEntryPanel hasBusinessPlan={latestPlan !== null} />
       </div>
 
       <Overview

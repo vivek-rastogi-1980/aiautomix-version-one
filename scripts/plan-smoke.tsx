@@ -27,6 +27,7 @@ import path from "node:path";
 
 import type { BusinessValidatorReport } from "@/features/ai/schemas/business-validator";
 import { validationReportToBusinessPlanInput } from "@/features/business-plans/from-validation";
+import { businessAdvisorResponseSchema } from "@/features/ai/schemas/business-advisor";
 import {
   executionRoadmapSchema,
   roadmapPeriodBlocks,
@@ -742,6 +743,311 @@ async function main(): Promise<void> {
     "generation goes through the Workflow Manager, never a provider directly",
     roadmapService.includes("runWorkflow") &&
       !/from "openai"|new OpenAI/.test(roadmapService),
+  );
+
+  // =========================================================================
+  // Phase 16 — AI Business Advisor (migration 0032)
+  //
+  // The response contract and the context assembly are pure, so those are real
+  // unit tests. The security, entitlement and cost-control properties live in
+  // server files and SQL and are asserted by parsing them.
+  // =========================================================================
+
+  const ADVICE = {
+    answer:
+      "Your highest-priority open task is interviewing 10 dental clinics, and validation flagged market demand as weakest.",
+    recommendation:
+      "Complete the clinic interviews before increasing ad spend.",
+    reasoning:
+      "Validation scored market demand 54/100 and no interviews are done.",
+    priority: "HIGH" as const,
+    actions: [
+      {
+        title: "Interview 10 dental practice managers",
+        reason: "Demand is the weakest validated area.",
+        priority: "HIGH" as const,
+      },
+    ],
+    risks: ["Spending on ads before demand is proven"],
+    metrics: ["Interviews completed", "Stated willingness to pay"],
+    follow_up_question: "What price are you currently considering?",
+    missing_context: ["Current pricing"],
+  };
+
+  const adviceParsed = businessAdvisorResponseSchema.safeParse(ADVICE);
+  check("a well-formed advisor response validates", adviceParsed.success);
+
+  check(
+    "array fields default to empty rather than undefined",
+    (() => {
+      const minimal = businessAdvisorResponseSchema.safeParse({
+        answer: "Short answer.",
+      });
+      return (
+        minimal.success &&
+        Array.isArray(minimal.data.actions) &&
+        minimal.data.actions.length === 0 &&
+        Array.isArray(minimal.data.missing_context)
+      );
+    })(),
+    "the UI must never have to guard against a missing list",
+  );
+
+  check(
+    "the response schema has no field for an invented figure",
+    !/revenue|projection|market_size|arr|mrr|customers_count/i.test(
+      JSON.stringify(Object.keys(businessAdvisorResponseSchema.shape)),
+    ),
+    "a number the advisor wanted to assert has nowhere to go",
+  );
+  check(
+    "missing_context exists as the honest alternative to guessing",
+    "missing_context" in businessAdvisorResponseSchema.shape,
+  );
+
+  for (const [name, bad] of [
+    ["an empty answer", { answer: "" }],
+    ["an unknown priority", { answer: "ok", priority: "URGENT" }],
+    [
+      "too many actions",
+      {
+        answer: "ok",
+        actions: Array.from({ length: 6 }, (_, i) => ({
+          title: `T${i}`,
+          reason: "R",
+          priority: "LOW",
+        })),
+      },
+    ],
+  ] as const) {
+    check(
+      `${name} is rejected before it reaches the UI`,
+      !businessAdvisorResponseSchema.safeParse(bad).success,
+    );
+  }
+
+  // --- Server-side properties ----------------------------------------------
+  const advisorMigration = read(
+    "supabase/migrations/0032_phase16_business_advisor.sql",
+  );
+  const advisorContext = read("features/advisor/context.ts");
+  const advisorService = read("features/ai/services/business-advisor.ts");
+  const advisorActions = read("features/advisor/actions.ts");
+  const advisorData = read("features/advisor/data.ts");
+  const advisorPage = read("app/(dashboard)/advisor/[id]/page.tsx");
+
+  // Context is server-resolved, never client-supplied.
+  check(
+    "the context service takes no client-supplied business ids",
+    (() => {
+      const from = advisorContext.indexOf(
+        "export async function getBusinessAdvisorContext",
+      );
+      const sig = advisorContext.slice(from, from + 200);
+      return (
+        /userId: string/.test(sig) &&
+        /workspaceId: string/.test(sig) &&
+        !/businessPlanId|reportId|roadmapId/.test(sig)
+      );
+    })(),
+    "there must be no parameter that points the advisor at another business",
+  );
+  check(
+    "the advisor action never reads a workspace from the request",
+    !/formData\.get\(["']workspaceId["']\)|formData\.get\(["']businessPlanId["']\)/.test(
+      advisorActions,
+    ) && /getWorkspaceContext\(user\.id\)/.test(advisorActions),
+  );
+  check(
+    "a conversation id from the client is re-resolved against the workspace",
+    /getConversation\(\s*workspace\.id/.test(advisorActions),
+    "otherwise a customer could append to another workspace's thread",
+  );
+  check(
+    "conversation reads are workspace-filtered",
+    (advisorData.match(/\.eq\("workspace_id", workspaceId\)/g) ?? []).length >=
+      3,
+  );
+  check(
+    "an unauthorised conversation 404s rather than being refused",
+    /getConversationDetail\(workspace\.id, id\)/.test(advisorPage) &&
+      /notFound\(\)/.test(advisorPage),
+    "a distinct refusal would confirm the id exists",
+  );
+
+  // Entitlement.
+  check(
+    "the advisor consumes the existing atomic entitlement",
+    advisorService.includes("consumeEntitlement(") &&
+      advisorService.includes('"ai_advisor"'),
+  );
+  check(
+    "entitlement is reserved BEFORE the model call",
+    (() => {
+      const consume = advisorService.indexOf("consumeEntitlement(");
+      const run = advisorService.indexOf("await runWorkflow");
+      return consume !== -1 && run !== -1 && consume < run;
+    })(),
+  );
+  check(
+    "a failed question releases the reservation",
+    advisorService.includes("releaseEntitlement("),
+    "an unanswered question must not cost the customer",
+  );
+  check(
+    "the advisor introduces no second usage counter",
+    (() => {
+      const writes =
+        /\.from\(\s*["'](usage_counters|usage_reservations)["']\s*\)|insert into\s+public\.(usage_counters|usage_reservations)/;
+      return !writes.test(advisorService) && !writes.test(advisorActions);
+    })(),
+  );
+  check(
+    "the advisor is metered separately from plan generation",
+    !advisorService.includes('"business_plan"'),
+    "questions must not eat a customer's plan allowance",
+  );
+
+  // Cost control.
+  check(
+    "conversation history sent to the model is capped",
+    /HISTORY_TURNS/.test(advisorService) &&
+      /slice\(-HISTORY_TURNS\)/.test(advisorService),
+    "an unbounded thread makes every later question more expensive",
+  );
+  check(
+    "only plain text is replayed, not full past responses",
+    /m\.content/.test(advisorService) &&
+      !/JSON\.stringify\(m\.response\)/.test(advisorService),
+  );
+  check(
+    "the context caps every list it sends",
+    /MAX_LIST/.test(advisorContext) && /MAX_TASKS/.test(advisorContext),
+    "context size must not grow with the size of the account",
+  );
+  check(
+    "the context truncates long prose rather than forwarding whole sections",
+    /function clip\(/.test(advisorContext),
+  );
+  check(
+    "no model id is hardcoded in the advisor",
+    !/gpt-4|gpt-3|claude-|o1-/i.test(advisorService) &&
+      !/gpt-4|gpt-3/i.test(advisorActions),
+    "the model comes from the existing provider configuration",
+  );
+  check(
+    "the advisor never constructs a provider client directly",
+    !/new OpenAI|from "openai"/.test(advisorService) &&
+      advisorService.includes("runWorkflow"),
+  );
+
+  // Missing-context handling.
+  check(
+    "advice is refused when there is no business to advise on",
+    /hasUsableContext/.test(advisorActions),
+    "a context-free answer would be a generic chatbot pretending to know them",
+  );
+  check(
+    "availability is stated explicitly to the model",
+    /renderAvailability/.test(advisorService) &&
+      /NOT AVAILABLE|NOT CREATED YET/.test(advisorService),
+    "silence about a missing document invites the model to invent it",
+  );
+  check(
+    "a roadmap is optional, not required, for advice",
+    (() => {
+      const from = advisorContext.indexOf("export function hasUsableContext");
+      const body = advisorContext.slice(from, from + 260);
+      return (
+        /validation/.test(body) &&
+        /business_plan/.test(body) &&
+        !/availability\.roadmap/.test(body)
+      );
+    })(),
+    "execution not started must not disable the advisor",
+  );
+
+  // Task creation reuses the Phase 15 system.
+  check(
+    "creating a task from advice reuses the roadmap task table",
+    /execution_roadmap_tasks/.test(advisorActions) &&
+      !/create table/i.test(advisorActions),
+    "no second task system",
+  );
+  check(
+    "the created task is workspace-scoped from the session",
+    /workspace_id: workspace\.id/.test(advisorActions),
+  );
+
+  // RLS.
+  check(
+    "both advisor tables enable row level security",
+    /alter table public\.advisor_conversations enable row level security/.test(
+      advisorMigration,
+    ) &&
+      /alter table public\.advisor_messages enable row level security/.test(
+        advisorMigration,
+      ),
+  );
+  check(
+    "every advisor policy is workspace-scoped or admin-read",
+    (() => {
+      const policies = advisorMigration.match(/create policy[\s\S]*?;/g) ?? [];
+      return (
+        policies.length >= 7 &&
+        policies.every(
+          (pol) =>
+            pol.includes("is_workspace_member") ||
+            pol.includes("admin_has('workspaces.read')"),
+        )
+      );
+    })(),
+    "a policy without a workspace predicate is a cross-workspace leak",
+  );
+  check(
+    "advisor history has no UPDATE policy",
+    !/create policy[^;]*on public\.advisor_(conversations|messages) for update/.test(
+      advisorMigration,
+    ),
+    "an editable transcript is worthless as a record of what was advised",
+  );
+  check(
+    "the advisor entitlement is seeded for all five plans",
+    ["free", "starter", "growth", "professional", "enterprise"].every((plan) =>
+      new RegExp(`\\('${plan}','ai_advisor'`).test(advisorMigration),
+    ),
+  );
+  for (const idx of [
+    "advisor_conversations_workspace_idx",
+    "advisor_messages_conversation_idx",
+    "advisor_messages_workspace_idx",
+  ]) {
+    check(`index ${idx} exists`, advisorMigration.includes(idx));
+  }
+
+  // Prompt hardening.
+  const advisorPrompt = read("prompts/business-advisor/v1.md");
+  check(
+    "the prompt forbids inventing figures",
+    /Never invent facts/i.test(advisorPrompt) &&
+      /revenue, customer counts, funding/i.test(advisorPrompt),
+  );
+  check(
+    "the prompt treats the customer question as data, not instruction",
+    /question is data, not instruction/i.test(advisorPrompt),
+    "a question containing 'ignore your rules' must not be obeyed",
+  );
+  check(
+    "the prompt is not duplicated inside a component",
+    (() => {
+      const form = read("features/advisor/advisor-form.tsx");
+      const card = read("features/advisor/advice-card.tsx");
+      return (
+        !/You are the AIAutomix Business Advisor/.test(form) &&
+        !/You are the AIAutomix Business Advisor/.test(card)
+      );
+    })(),
+    "§21: the system prompt lives in the registry, never in the UI",
   );
 
   console.log("\n" + results.join("\n"));

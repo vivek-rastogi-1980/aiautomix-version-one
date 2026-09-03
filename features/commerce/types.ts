@@ -38,6 +38,11 @@ export const FEATURES = [
   // Starter. Writing your own 90-day checklist carries none of that risk, and
   // gating it there would put the Plan -> Execute journey behind a paid tier.
   "execution_roadmap",
+  // Phase 16. Seeded across all five plans by migration 0032. Its own flag with
+  // a much higher limit than the generation features: asking the advisor a
+  // question is a cheap call a customer makes many times, and metering it
+  // against `business_plan` would let a few questions eat a plan allowance.
+  "ai_advisor",
   "team_members",
   "api_access",
 ] as const;

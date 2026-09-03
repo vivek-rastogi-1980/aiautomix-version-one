@@ -11,6 +11,7 @@ import {
   FileText,
   FolderKanban,
   LayoutDashboard,
+  MessagesSquare,
   Megaphone,
   PlayCircle,
   Microscope,
@@ -32,6 +33,10 @@ interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  // Phase 16. Placed second, directly under the dashboard: the advisor is
+  // the thing a customer reaches for between doing pieces of work, not a
+  // product they go looking for at the bottom of a list.
+  { href: "/advisor", label: "AI Advisor", icon: MessagesSquare },
   { href: "/validator", label: "Idea Validator", icon: Sparkles },
   { href: "/plans", label: "Business Plans", icon: NotebookPen },
   { href: "/research", label: "Market Research", icon: Microscope },

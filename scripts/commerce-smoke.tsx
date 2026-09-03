@@ -54,6 +54,8 @@ function main(): void {
     "supabase/migrations/0018_phase10_execution_foundation.sql",
     // Phase 15 seeds `execution_roadmap` across all five plans.
     "supabase/migrations/0031_phase15_execution_roadmap.sql",
+    // Phase 16 seeds `ai_advisor` across all five plans.
+    "supabase/migrations/0032_phase16_business_advisor.sql",
   ]
     .map((file) => readFileSync(path.join(process.cwd(), file), "utf8"))
     .join("\n");
@@ -66,12 +68,12 @@ function main(): void {
       new RegExp(`\\('${id}',`).test(migration),
     );
   }
-  check("eleven features defined", FEATURES.length === 11);
+  check("twelve features defined", FEATURES.length === 12);
 
   // Every plan must state a position on every feature. A missing pair is worse
   // than a denial: `canAccess` finds no row and falls through to its
   // fail-closed default, so the feature silently disappears from a paid plan.
-  // 5 plans x 11 features = 55 rows.
+  // 5 plans x 12 features = 60 rows.
   let missingPairs = 0;
   for (const plan of PLAN_IDS) {
     for (const feature of FEATURES) {
@@ -425,7 +427,6 @@ function main(): void {
     "failing open is worst exactly when load is highest",
   );
 
-
   // =========================================================================
   // Phase 14 — workspace plan assignment and plan history (migration 0029)
   //
@@ -654,7 +655,6 @@ function main(): void {
       /'new_plan', p_plan_id/.test(planMigration),
     "so a caller that lost a race sees the real before-state",
   );
-
 
   // --- Report ---------------------------------------------------------------
   console.log(results.join("\n"));
