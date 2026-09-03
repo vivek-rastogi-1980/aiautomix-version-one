@@ -15,6 +15,9 @@ import { StartResearchLink } from "@/features/research/start-research-link";
 import { StartCompetitorsLink } from "@/features/competitors/start-competitors-link";
 import { StartFinancialsLink } from "@/features/financials/start-financials-link";
 import { StartMarketingLink } from "@/features/marketing/start-marketing-link";
+import { RoadmapPanel } from "@/features/roadmaps/roadmap-panel";
+import { getRoadmapDetailForPlan } from "@/features/roadmaps/data";
+import { executionRoadmapSchema } from "@/features/ai/schemas/execution-roadmap";
 import { getWorkspaceContext } from "@/features/workspaces/data";
 import { canEdit } from "@/features/workspaces/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -36,6 +39,24 @@ export default async function PlanPage({ params }: PageProps) {
 
   const { plan, sections, history } = result;
   const editable = canEdit(role);
+
+  // Whether a roadmap already exists is decided HERE, on the server, before the
+  // panel renders. That is what makes duplicate protection visible rather than
+  // only enforced: a customer who already has a roadmap is never shown a button
+  // that would create a second one.
+  const roadmap = await getRoadmapDetailForPlan(workspace.id, plan.id);
+
+  // Milestones live in the generated document rather than their own rows, so
+  // the count comes from re-parsing it. A document an older prompt version
+  // wrote simply yields no count instead of breaking the page.
+  const roadmapDocument = roadmap
+    ? executionRoadmapSchema.safeParse(roadmap.roadmap.document)
+    : null;
+  const milestoneCount = roadmapDocument?.success
+    ? roadmapDocument.data.days_30.milestones.length +
+      roadmapDocument.data.days_60.milestones.length +
+      roadmapDocument.data.days_90.milestones.length
+    : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,6 +102,18 @@ export default async function PlanPage({ params }: PageProps) {
           </div>
         </div>
       </Card>
+
+      {/* --- Execution ------------------------------------------------
+          Placed immediately under the header: once a plan exists, "what do I
+          do now?" is the question the customer opens this page with. */}
+      <RoadmapPanel
+        businessPlanId={plan.id}
+        roadmapExists={Boolean(roadmap)}
+        progress={roadmap?.progress}
+        taskCount={roadmap?.tasks.length}
+        milestoneCount={milestoneCount}
+        canEdit={editable}
+      />
 
       {plan.status === "failed" ? (
         <FormAlert variant="error">

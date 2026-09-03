@@ -32,6 +32,12 @@ export const FEATURES = [
   // flag: planning go-to-market work says nothing about whether a
   // workspace may reach outside AIAutoMix and change things.
   "business_execution",
+  // Phase 15. Seeded across all five plans by migration 0031. Its own flag,
+  // deliberately NOT `business_execution`: that one gates the automation engine
+  // reaching outside AIAutoMix to change things, and is denied on Free and
+  // Starter. Writing your own 90-day checklist carries none of that risk, and
+  // gating it there would put the Plan -> Execute journey behind a paid tier.
+  "execution_roadmap",
   "team_members",
   "api_access",
 ] as const;
