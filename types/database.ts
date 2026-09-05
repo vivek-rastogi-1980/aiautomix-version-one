@@ -207,6 +207,31 @@ export type WorkspaceMember = {
   updated_at: string;
 };
 
+/** Phase 16 — AI Business Advisor (migration 0032). */
+export type AdvisorMessageRole = "user" | "assistant";
+
+export type AdvisorConversation = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdvisorMessage = {
+  id: string;
+  conversation_id: string;
+  workspace_id: string;
+  role: AdvisorMessageRole;
+  content: string;
+  /** The validated structured advisor response. Null on user turns. */
+  response: Record<string, unknown> | null;
+  model: string | null;
+  ai_request_id: string | null;
+  created_at: string;
+};
+
 /** Phase 15 — execution roadmap vocabularies (migration 0031). */
 export type RoadmapPeriod = "30" | "60" | "90";
 
@@ -480,6 +505,33 @@ type WorkspaceMemberInsert = {
 type WorkspaceMemberUpdate = Partial<
   Omit<WorkspaceMember, "id" | "created_at">
 >;
+
+type AdvisorConversationInsert = {
+  workspace_id: string;
+  user_id: string;
+  title: string;
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type AdvisorConversationUpdate = Partial<
+  Omit<AdvisorConversation, "id" | "workspace_id" | "created_at">
+>;
+
+type AdvisorMessageInsert = {
+  conversation_id: string;
+  workspace_id: string;
+  role: AdvisorMessageRole;
+  content: string;
+  response?: Record<string, unknown> | null;
+  model?: string | null;
+  ai_request_id?: string | null;
+  id?: string;
+  created_at?: string;
+};
+
+type AdvisorMessageUpdate = Partial<Omit<AdvisorMessage, "id" | "created_at">>;
 
 type ExecutionRoadmapInsert = {
   workspace_id: string;
@@ -1750,6 +1802,18 @@ export interface Database {
         Row: BusinessPlan;
         Insert: BusinessPlanInsert;
         Update: BusinessPlanUpdate;
+        Relationships: [];
+      };
+      advisor_conversations: {
+        Row: AdvisorConversation;
+        Insert: AdvisorConversationInsert;
+        Update: AdvisorConversationUpdate;
+        Relationships: [];
+      };
+      advisor_messages: {
+        Row: AdvisorMessage;
+        Insert: AdvisorMessageInsert;
+        Update: AdvisorMessageUpdate;
         Relationships: [];
       };
       execution_roadmaps: {
